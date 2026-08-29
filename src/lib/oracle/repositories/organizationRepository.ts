@@ -1,4 +1,4 @@
-import { executeQuery } from '../pool';
+import { executeQuery, getOraclePool } from '../pool';
 
 export interface OrgMemberNode {
   memberId: string;

@@ -1,4 +1,4 @@
-import { executeQuery, getOraclePool } from '../pool';
+import { executeQuery, getPool } from '../pool';
 
 export interface AuditLogItem {
   id?: string;
