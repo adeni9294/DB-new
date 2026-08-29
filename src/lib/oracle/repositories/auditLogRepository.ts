@@ -15,7 +15,7 @@ export interface CreateTransactionDTO {
 }
 
 export async function createTransaction(dto: CreateTransactionDTO): Promise<string> {
-  const pool = await getOraclePool();
+const pool = await getPool();
   const connection = await pool.getConnection();
 
   try {
