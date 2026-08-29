@@ -1,7 +1,7 @@
 import oracledb from 'oracledb';
 import path from 'path';
 
-let pool: oracledb.Pool | null = null;
+let pool: any = null;
 
 export async function getPool() {
   if (pool) return pool;
