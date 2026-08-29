@@ -1,5 +1,4 @@
 import { executeQuery, getPool } from '../pool';
-import { executeAuditLog } from './auditLogRepository';
 
 export interface CreateTransactionDTO {
   userId: string;
