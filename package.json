@@ -2,6 +2,11 @@
   "name": "db_new",
   "version": "0.1.0",
   "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "oracledb"
+    ]
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
