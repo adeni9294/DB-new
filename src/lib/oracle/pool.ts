@@ -29,3 +29,27 @@ export async function getPool() {
 
   return pool;
 }
+
+// Tambahkan dan export fungsi executeQuery di sini
+export async function executeQuery(sql: string, binds: any = {}) {
+  const dbPool = await getPool();
+  let connection;
+  try {
+    connection = await dbPool.getConnection();
+    const result = await connection.execute(sql, binds, {
+      autoCommit: true,
+    });
+    return result;
+  } catch (err) {
+    console.error('Database execution error:', err);
+    throw err;
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error('Error closing connection:', err);
+      }
+    }
+  }
+}
