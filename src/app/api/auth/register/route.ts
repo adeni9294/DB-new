@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getPool } from '@/lib/oracle/pool';
 
-function hashPassword(password: string): string {
-  return crypto.pbkdf2Sync(password, 'static_salt', 1000, 32, 'sha512').toString('hex');
+function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 1000, 32, 'sha512').toString('hex');
 }
 
 export async function POST(request: Request) {
@@ -40,12 +40,12 @@ export async function POST(request: Request) {
     const passwordHash = hashPassword(password, salt);
 
     // Insert user baru
-await connection.execute(
-  `INSERT INTO app_users (id, email, password_hash, salt, name, role, created_at)
-   VALUES (SYS_GUID(), :email, :passwordHash, :salt, :fullName, 'user', SYSDATE)`,
-  [email.toLowerCase(), passwordHash, salt, fullName],
-  { autoCommit: true }
-);
+    await connection.execute(
+      `INSERT INTO app_users (id, email, password_hash, salt, name, role, created_at)
+       VALUES (SYS_GUID(), :email, :passwordHash, :salt, :fullName, 'user', SYSDATE)`,
+      [email.toLowerCase(), passwordHash, salt, fullName],
+      { autoCommit: true }
+    );
 
     return NextResponse.json(
       { message: 'Registrasi berhasil! Silakan login.' },
@@ -53,7 +53,6 @@ await connection.execute(
     );
   } catch (error: any) {
     console.error('Register error:', error);
-    // Tampilkan detail error asli dari Oracle (misal: ORA-00942 jika tabel belum ada)
     return NextResponse.json(
       { message: error.message || 'Gagal mendaftar pengguna baru' },
       { status: 500 }
