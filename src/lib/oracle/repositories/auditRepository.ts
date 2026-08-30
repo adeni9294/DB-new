@@ -1,4 +1,4 @@
-import { executeQuery, getPool } from '../pool';
+import { executeQuery } from '../pool';
 
 export interface AuditLogItem {
   id?: string;
@@ -10,6 +10,19 @@ export interface AuditLogItem {
   details?: string;
   ipAddress?: string;
   createdAt?: string;
+}
+
+// Type buat hasil dari DB Oracle
+type DbAuditLogRow = {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  action: string;
+  entity_name: string;
+  entity_id: string | null;
+  details: string | null;
+  ip_address: string | null;
+  created_at: string;
 }
 
 export async function logActivity(log: AuditLogItem): Promise<void> {
@@ -53,17 +66,17 @@ export async function getRecentAuditLogs(limit = 20): Promise<AuditLogItem[]> {
     FETCH FIRST :limit ROWS ONLY
   `;
 
-  const rows = await executeQuery(sql, { limit });
+  const rows = await executeQuery(sql, { limit }) as DbAuditLogRow[];
 
   return rows.map((r) => ({
-    id: r.ID,
-    userId: r.USER_ID,
-    userName: r.USER_NAME || 'System',
-    action: r.ACTION,
-    entityName: r.ENTITY_NAME,
-    entityId: r.ENTITY_ID,
-    details: r.DETAILS,
-    ipAddress: r.IP_ADDRESS,
-    createdAt: r.CREATED_AT,
+    id: r.id,
+    userId: r.user_id,
+    userName: r.user_name || 'System',
+    action: r.action,
+    entityName: r.entity_name,
+    entityId: r.entity_id || undefined,
+    details: r.details || undefined,
+    ipAddress: r.ip_address || undefined,
+    createdAt: r.created_at,
   }));
 }
