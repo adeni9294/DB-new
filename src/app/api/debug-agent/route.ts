@@ -11,9 +11,13 @@ export async function POST(req: Request) {
   const { messages, code } = await req.json()
 
   const result = await streamText({
-    model: nineRouter('google/gemini-3.5-flash'), // ganti ke 'qwen/qwen-2.5-coder' kalau pake 9router lokal
-    messages,
+    model: nineRouter('google/gemini-3.5-flash'),
+    system: `Kamu Senior Dev Next.js + TypeScript. Jelaskan penyebab error dan kasih kode fix. Bahasa Indonesia.`,
+    messages: [
+      ...messages,
+      { role: 'user', content: `Kode yg error:\n\`\`tsx\n${code}\n\`\`` }
+    ],
   })
 
-  return result.toDataStreamResponse()
+  return result.toTextStreamResponse() // INI YANG DIGANTI
 }
