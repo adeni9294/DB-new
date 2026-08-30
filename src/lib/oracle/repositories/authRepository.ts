@@ -1,4 +1,4 @@
-import { executeQuery, getOraclePool } from '../pool';
+import { executeQuery } from '../pool';
 import crypto from 'crypto';
 
 export interface UserSession {
