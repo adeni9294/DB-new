@@ -11,13 +11,13 @@ export async function POST(req: Request) {
   const { messages, code } = await req.json()
 
   const result = await streamText({
-    model: nineRouter('google/gemini-3.5-flash'),
-    system: `Kamu Senior Dev Next.js + TypeScript. Jelaskan penyebab error dan kasih kode fix. Bahasa Indonesia.`,
+    model: nineRouter('google/gemini-2.5-flash'),
+    system: `Kamu Senior Dev Next.js. Jawab error dan kasih fix kode. Bahasa Indonesia singkat.`,
     messages: [
-      ...messages,
-      { role: 'user', content: `Kode yg error:\n\`\`tsx\n${code}\n\`\`` }
+      ...messages.slice(0, -1),
+      { role: 'user', content: `Kode: \n\`\`\`tsx\n${code}\n\`\`\`\nPertanyaan: ${messages[messages.length-1]?.content}` }
     ],
   })
 
-  return result.toTextStreamResponse() // INI YANG DIGANTI
+  return result.toTextStreamResponse()
 }
