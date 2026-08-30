@@ -1,24 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { useChat } from 'ai/react' // atau 'ai' kalau v5.1+
+import { useChat } from '@ai-sdk/react' // GANTI INI
+import { UIMessage } from 'ai' // optional, buat type
 
 export default function DebugPage() {
   const [code, setCode] = useState('')
+  const [input, setInput] = useState('')
 
-  const { messages, handleSubmit, isLoading, append } = useChat({
+  const { messages, isLoading, append } = useChat({
     api: '/api/debug-agent',
-    body: { code }, // ini bakal ke kirim tiap request
+    body: { code }, // ini ke kirim tiap request
   })
-
-  const [input, setInput] = useState('') // bikin manual
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
-    
-    // kirim message + sekalian kirim code terbaru
-    append({ role: 'user', content: input }, { body: { code } })
+    append({ role: 'user', content: input })
     setInput('')
   }
 
@@ -26,7 +24,6 @@ export default function DebugPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">AI Debug Agent</h1>
       
-      {/* Textarea buat paste kode */}
       <textarea 
         value={code}
         onChange={(e) => setCode(e.target.value)}
@@ -34,7 +31,6 @@ export default function DebugPage() {
         className="w-full h-40 p-2 border rounded mb-4 font-mono"
       />
 
-      {/* Chat UI */}
       <div className="border rounded p-4 h-96 overflow-y-auto mb-4">
         {messages.map(m => (
           <div key={m.id} className={`mb-2 ${m.role === 'user' ? 'text-right' : ''}`}>
