@@ -1,26 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useChat } from '@ai-sdk/react'
+import { useChat } from 'ai/react' // V4 pake ini
 
 export default function DebugPage() {
   const [code, setCode] = useState('')
 
-  const { messages, status, append } = useChat({ // GANTI isLoading -> status
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({ // V4 = isLoading
     api: '/api/debug-agent',
-    body: { code },
+    body: { code }, // kirim code tiap request
   })
-
-  const isLoading = status === 'streaming' || status === 'submitted' // bikin manual
-
-  const [input, setInput] = useState('')
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim()) return
-    append({ role: 'user', content: input })
-    setInput('')
-  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -36,18 +25,19 @@ export default function DebugPage() {
       <div className="border rounded p-4 h-96 overflow-y-auto mb-4 bg-gray-50">
         {messages.map(m => (
           <div key={m.id} className={`mb-3 ${m.role === 'user' ? 'text-right' : ''}`}>
-            <div className={`inline-block p-2 rounded ${m.role === 'user' ? 'bg-blue-500 text-white' : 'bg-white'}`}>
-              <b>{m.role}:</b> {m.content}
+            <div className={`inline-block p-2 rounded max-w-[80%] ${m.role === 'user' ? 'bg-blue-500 text-white' : 'bg-white border'}`}>
+              <b>{m.role}:</b> 
+              <pre className="whitespace-pre-wrap text-sm">{m.content}</pre>
             </div>
           </div>
         ))}
         {isLoading && <p className="text-gray-500">AI lagi mikir...</p>}
       </div>
 
-      <form onSubmit={onSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex gap-2">
         <input 
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange} // V4 = handleInputChange
           placeholder="Tanya tentang error..."
           className="flex-1 p-2 border rounded"
           disabled={isLoading}
