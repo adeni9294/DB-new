@@ -1,22 +1,24 @@
 import { openai } from '@ai-sdk/openai'
-import { streamText, tool } from 'ai'
+import { streamText } from 'ai'
 import { z } from 'zod'
 
-const client = openai({
-  baseURL: process.env.OPENAI_BASE_URL,
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// JANGAN bikin const client lagi
+// Langsung pake openai() di dalam streamText
 
 export async function POST(req: Request) {
-  const { error, code } = await req.json()
+  const { messages, code } = await req.json()
 
   const result = await streamText({
-    model: client('gemini-1.5-flash-latest'), // otak nya pake Gemini via 9Router
-    system: `Kamu adalah Senior Dev. Tugasmu: 1. Analisis error 2. Kasih solusi kode yg udah di fix 3. Jelasin kenapa error`,
-    prompt: `Ini error nya: ${error}\n\nIni kode nya:\n${code}`,
-    tools: {
-      // Nanti bisa ditambahin tool buat baca file langsung
-    }
+    // INI CARA BARU BUAT CUSTOM BASEURL
+    model: openai('gemini-1.5-flash-latest', {
+      baseURL: process.env.OPENAI_BASE_URL, // contoh: https://openrouter.ai/api/v1
+      apiKey: process.env.OPENAI_API_KEY,
+    }),
+    system: `Kamu adalah Senior Dev Next.js + TypeScript. Analisis error ini dan kasih solusi + kode fix nya. Jawab singkat dan to the point.`,
+    messages: [
+      ...messages,
+      { role: 'user', content: `Ini kode saya:\n\`\n${code}\n\`\`` }
+    ],
   })
 
   return result.toDataStreamResponse()
