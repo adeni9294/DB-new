@@ -9,7 +9,14 @@ export interface UserSession {
   token: string;
 }
 
-// Fungsi membuat sesi login baru di Oracle ADB
+type DbUserSessionRow = {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  role: string;
+  session_token: string;
+}
+
 export async function createSession(userId: string): Promise<string> {
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const sql = `
@@ -21,7 +28,6 @@ export async function createSession(userId: string): Promise<string> {
   return sessionToken;
 }
 
-// Validasi token sesi langsung dari Oracle ADB
 export async function validateSession(token: string): Promise<UserSession | null> {
   const sql = `
     SELECT 
@@ -36,15 +42,15 @@ export async function validateSession(token: string): Promise<UserSession | null
       AND s.expires_at > CURRENT_TIMESTAMP
   `;
 
-  const rows = await executeQuery<any>(sql, { token });
+  const rows = await executeQuery(sql, { token }) as DbUserSessionRow[]; // <-- INI YG BENER
   if (rows.length === 0) return null;
 
   const row = rows[0];
   return {
-    userId: row.USER_ID,
-    userName: row.USER_NAME,
-    userEmail: row.USER_EMAIL,
-    role: row.ROLE,
-    token: row.SESSION_TOKEN,
+    userId: row.user_id,
+    userName: row.user_name,
+    userEmail: row.user_email,
+    role: row.role,
+    token: row.session_token,
   };
 }
