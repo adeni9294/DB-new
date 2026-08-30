@@ -53,7 +53,8 @@ export async function getRecentAuditLogs(limit = 20): Promise<AuditLogItem[]> {
     FETCH FIRST :limit ROWS ONLY
   `;
 
-  const rows = await executeQuery<any>(sql, { limit });
+  const rows = await executeQuery(sql, { limit });
+  const rows = result as any[];
 
   return rows.map((r) => ({
     id: r.ID,
