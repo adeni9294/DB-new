@@ -30,6 +30,10 @@ export async function getPool() {
   return pool;
 }
 
+// INI YG KURANG - alias buat getPool biar gak ubah repo
+export const getOraclePool = getPool;
+
+
 // Tambahkan dan export fungsi executeQuery di sini
 export async function executeQuery(sql: string, binds: any = {}) {
   const dbPool = await getPool();
@@ -38,8 +42,9 @@ export async function executeQuery(sql: string, binds: any = {}) {
     connection = await dbPool.getConnection();
     const result = await connection.execute(sql, binds, {
       autoCommit: true,
+      outFormat: oracledb.OUT_FORMAT_OBJECT // <-- TAMBAHIN INI biar return object bukan array
     });
-    return result;
+    return result.rows || []; // <-- return rows nya aja
   } catch (err) {
     console.error('Database execution error:', err);
     throw err;

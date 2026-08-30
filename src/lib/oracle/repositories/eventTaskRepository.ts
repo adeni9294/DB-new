@@ -1,4 +1,5 @@
 import { executeQuery, getOraclePool } from '../pool';
+import oracledb from 'oracledb';
 
 export interface EventDTO {
   organizationId?: string;
@@ -17,9 +18,13 @@ export interface TaskDTO {
   assignedTo?: string;
   title: string;
   description?: string;
-  dueDate?: string;
+  dueDate?: string; // YYYY-MM-DD
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 }
+
+// Type buat hasil DB
+type DbEventRow = { id: string }
+type DbTaskRow = { id: string }
 
 export async function createEvent(dto: EventDTO): Promise<string> {
   const sql = `
@@ -48,15 +53,54 @@ export async function createEvent(dto: EventDTO): Promise<string> {
         startDate: dto.startDate,
         endDate: dto.endDate,
         location: dto.location || null,
-        id: { type: 2002, dir: 3003 }
+        id: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
       },
       { autoCommit: true }
     );
-    return (res.outBinds as any).id[0];
+    return (res.outBinds as DbEventRow).id;
   } finally {
     await conn.close();
   }
 }
+
+export async function createTask(dto: TaskDTO): Promise<string> {
+  const sql = `
+    INSERT INTO tasks (
+      created_by, organization_id, event_id, assigned_to, 
+      title, description, due_date, priority, status
+    ) VALUES (
+      :userId, :organizationId, :eventId, :assignedTo,
+      :title, :description, 
+      TO_DATE(:dueDate, 'YYYY-MM-DD'),
+      :priority, 'TODO'
+    ) RETURNING id INTO :id
+  `;
+
+  const pool = await getOraclePool();
+  const conn = await pool.getConnection();
+
+  try {
+    const res = await conn.execute(
+      sql,
+      {
+        userId: dto.userId,
+        organizationId: dto.organizationId || null,
+        eventId: dto.eventId || null,
+        assignedTo: dto.assignedTo || null,
+        title: dto.title,
+        description: dto.description || null,
+        dueDate: dto.dueDate || null,
+        priority: dto.priority,
+        id: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+      },
+      { autoCommit: true }
+    );
+    return (res.outBinds as DbTaskRow).id;
+  } finally {
+    await conn.close();
+  }
+}
+
 
 export async function updateTaskStatus(taskId: string, status: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'): Promise<void> {
   const sql = `
@@ -65,4 +109,17 @@ export async function updateTaskStatus(taskId: string, status: 'TODO' | 'IN_PROG
     WHERE id = :taskId
   `;
   await executeQuery(sql, { status, taskId });
+}
+
+export async function getEventsByOrg(orgId: string) {
+  const sql = `
+    SELECT id, title, description, 
+           TO_CHAR(start_date, 'YYYY-MM-DD HH24:MI') as start_date,
+           TO_CHAR(end_date, 'YYYY-MM-DD HH24:MI') as end_date,
+           location, status
+    FROM events 
+    WHERE organization_id = :orgId 
+    ORDER BY start_date DESC
+  `;
+  return await executeQuery(sql, { orgId });
 }
