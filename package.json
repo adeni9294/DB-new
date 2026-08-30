@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.51",
+    "@ai-sdk/openai-compatible": "^3.0.40",
     "@ai-sdk/react": "^4.0.87",
     "ai": "^7.0.84",
     "clsx": "^2.1.1",

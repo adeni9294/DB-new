@@ -1,23 +1,24 @@
-import { openai } from '@ai-sdk/openai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { streamText } from 'ai'
-import { z } from 'zod'
 
-// JANGAN bikin const client lagi
-// Langsung pake openai() di dalam streamText
+const nineRouter = createOpenAICompatible({
+  name: '9router',
+  baseURL: process.env.OPENAI_BASE_URL, // https://openrouter.ai/api/v1
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export async function POST(req: Request) {
   const { messages, code } = await req.json()
 
   const result = await streamText({
-    // INI CARA BARU BUAT CUSTOM BASEURL
-    model: openai('gemini-1.5-flash-latest', {
-      baseURL: process.env.OPENAI_BASE_URL, // contoh: https://openrouter.ai/api/v1
-      apiKey: process.env.OPENAI_API_KEY,
-    }),
-    system: `Kamu adalah Senior Dev Next.js + TypeScript. Analisis error ini dan kasih solusi + kode fix nya. Jawab singkat dan to the point.`,
+    // GANTI KE 2.5-FLASH - GRATIS & CEPET
+    model: nineRouter('google/gemini-2.5-flash'),
+    
+    system: `Kamu Senior Dev Next.js + TypeScript. Tugas: 1. Jelaskan penyebab error 2. Kasih kode fix lengkap 3. Jelaskan kenapa fix itu work. Jawab singkat, bahasa Indonesia.`,
+    
     messages: [
       ...messages,
-      { role: 'user', content: `Ini kode saya:\n\`\n${code}\n\`\`` }
+      { role: 'user', content: `Kode yg error:\n\`\`\`tsx\n${code}\n\`\`` }
     ],
   })
 
