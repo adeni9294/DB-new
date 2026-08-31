@@ -1,9 +1,12 @@
+export const dynamic = 'force-dynamic'; // 1. Biar gak di-build pas npm run build
+export const runtime = 'nodejs'; // 2. Wajib buat oracledb
+
 import { NextResponse } from 'next/server';
 import oracledb from 'oracledb';
 import crypto from 'crypto';
 
 // WAJIB: thin mode biar jalan di Vercel tanpa Oracle Client
-oracledb.initOracleClient({ libDir: undefined }); 
+oracledb.initOracleClient({ libDir: undefined });
 
 export async function POST(request: Request) {
   let connection;
@@ -14,16 +17,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Email dan Password wajib diisi' }, { status: 400 });
     }
 
-    // 1. Koneksi langsung, jangan pake pool
+    // 3. Cek env dulu biar errornya jelas
+    if (!process.env.DB_USER ||!process.env.DB_PASSWORD ||!process.env.DB_CONNECT_STRING) {
+      return NextResponse.json({ success: false, message: 'DB ENV belum diset di Vercel' }, { status: 500 });
+    }
+
+    // 4. Koneksi langsung, jangan pake pool
     connection = await oracledb.getConnection({
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       connectString: process.env.DB_CONNECT_STRING
     });
 
-    // 2. Query pake OUT_FORMAT_OBJECT biar enak
+    // 5. Pake schema ADMIN. karena login pake user ADMIN
     const result = await connection.execute(
-      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM app_users WHERE EMAIL = :email`,
+      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM ADMIN.APP_USERS WHERE EMAIL = :email`,
       [email],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -34,14 +42,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Email tidak ditemukan' }, { status: 401 });
     }
 
-    // 3. Cek password
+    // 6. Cek password
     const hash = crypto.pbkdf2Sync(password, user.SALT, 1000, 32, 'sha512').toString('hex');
 
     if (hash!== user.PASSWORD_HASH) {
       return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
     }
 
-    // 4. Sukses
+    // 7. Sukses
     return NextResponse.json({
       success: true,
       message: "Login berhasil",
