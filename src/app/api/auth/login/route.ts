@@ -1,67 +1,58 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getPool } from '@/lib/oracle/pool';
+import { executeQuery } from '@/lib/oracle/pool'; // <-- pake ini
 
 function hashPassword(password: string, salt: string): string {
   return crypto.pbkdf2Sync(password, salt, 1000, 32, 'sha512').toString('hex');
 }
 
 export async function POST(request: Request) {
-  let connection;
   try {
     const { email, password } = await request.json();
     if (!email ||!password) {
       return NextResponse.json({ message: 'Email dan password wajib diisi' }, { status: 400 });
     }
 
-    const pool = await getPool();
-    connection = await pool.getConnection();
-
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPassword = String(password).trim();
 
-    // SELECT pake full_name biar konsisten
-    const result = await connection.execute(
+    // 1. SELECT PAKE executeQuery -> hasilnya object
+    const users = await executeQuery(
       `SELECT id, email, password_hash, salt, full_name, role 
        FROM app_users 
        WHERE LOWER(TRIM(email)) = :email`,
-      [cleanEmail]
-    );
+      { email: cleanEmail }
+    ) as any[];
 
-    if (!result.rows || result.rows.length === 0) {
+    if (users.length === 0) {
       return NextResponse.json({ message: 'Email tidak terdaftar' }, { status: 401 });
     }
 
-    const rowData = result.rows[0] as any[];
-    const userId = rowData[0];
-    const userEmail = rowData[1];
-    const storedHash = String(rowData[2] || '').trim().toLowerCase();
-    const salt = String(rowData[3] || '').trim();
-    const userName = rowData[4]; // ini full_name
-    const userRole = rowData[5];
+    const user = users[0];
+    const storedHash = String(user.password_hash || '').trim().toLowerCase();
+    const salt = String(user.salt || '').trim();
 
-    // HASH PAKE SALT DARI DB
+    // 2. HASH PAKE SALT DARI DB
     const inputHash = hashPassword(cleanPassword, salt).toLowerCase();
 
     if (inputHash!== storedHash) {
       return NextResponse.json({ message: 'Password yang dimasukkan salah' }, { status: 401 });
     }
 
-    // Buat session
+    // 3. INSERT SESSION
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    await connection.execute(
+    await executeQuery(
       `INSERT INTO app_user_sessions (id, user_id, session_token, expires_at)
        VALUES (SYS_GUID(), :userId, :sessionToken, :expiresAt)`,
-      [userId, sessionToken, expiresAt],
-      { autoCommit: true }
+      { userId: user.id, sessionToken, expiresAt }
     );
 
     const response = NextResponse.json({
       success: true,
       message: 'Login berhasil',
-      user: { id: userId, email: userEmail, name: userName, role: userRole },
+      user: { id: user.id, email: user.email, name: user.full_name, role: user.role },
     });
 
     response.cookies.set('session_token', sessionToken, {
@@ -75,8 +66,6 @@ export async function POST(request: Request) {
     return response;
   } catch (error: any) {
     console.error('Login Error:', error);
-    return NextResponse.json({ message: error.message }, { status: 500 }); // kirim error asli buat debug
-  } finally {
-    if (connection) await connection.close();
+    return NextResponse.json({ message: error.message }, { status: 500 }); // biar keliatan error asli
   }
 }
