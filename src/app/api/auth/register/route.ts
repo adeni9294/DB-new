@@ -1,68 +1,54 @@
-import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { getPool } from '@/lib/oracle/pool';
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha512').toString('hex'); // 100000 iterasi, 32 bytes = 128 hex
-}
+import { NextResponse } from 'next/server';
+import oracledb from 'oracledb';
+import crypto from 'crypto';
 
 export async function POST(request: Request) {
   let connection;
   try {
-    const { email, password, fullName } = await request.json();
+    const { email, password } = await request.json();
 
-    if (!email ||!password ||!fullName) {
-      return NextResponse.json(
-        { message: 'Nama lengkap, email, dan password wajib diisi' },
-        { status: 400 }
-      );
+    if (!email ||!password) {
+      return NextResponse.json({ success: false, message: 'Email dan password wajib diisi' }, { status: 400 });
     }
 
-    const pool = await getPool();
-    connection = await pool.getConnection();
+    const connectString = `(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-batam-1.oraclecloud.com))(connect_data=(service_name=gfc40edfb77a0d0_dbhaulnew_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))`
 
-    const cleanEmail = email.toLowerCase().trim();
+    connection = await oracledb.getConnection({
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      connectString: connectString
+    });
 
-    // Cek user
-    const checkUser = await connection.execute(
-      `SELECT id FROM app_users WHERE LOWER(TRIM(email)) = :email`,
-      [cleanEmail],
-      { outFormat: 4002 } // OUT_FORMAT_OBJECT
+    const result = await connection.execute(
+      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM ADMIN.APP_USERS WHERE EMAIL = :email`,
+      [email],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
 
-    if (checkUser.rows && checkUser.rows.length > 0) {
-      await connection.close();
-      return NextResponse.json({ message: 'Email sudah terdaftar' }, { status: 409 });
+    const user = result.rows?.[0] as any;
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'Email tidak ditemukan' }, { status: 401 });
     }
 
-    // Generate Salt & Hash
-    const salt = crypto.randomBytes(16).toString('hex'); // 16 bytes = 32 hex
-    const passwordHash = hashPassword(password, salt);
+    // PENTING: 100000 iterasi sama kayak register
+    const hash = crypto.pbkdf2Sync(password, user.SALT, 100000, 32, 'sha512').toString('hex');
+    if (hash!== user.PASSWORD_HASH) {
+      return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
+    }
 
-    // Insert user baru
-    await connection.execute(
-      `INSERT INTO app_users (id, email, password_hash, salt, name, full_name, role, created_at)
-       VALUES (SYS_GUID(), :email, :passwordHash, :salt, :fullName, :fullName, 'user', SYSDATE)`,
-      {
-        email: cleanEmail, 
-        passwordHash, 
-        salt, 
-        fullName
-      },
-      { autoCommit: true }
-    );
+    return NextResponse.json({ 
+      success: true, 
+      message: "Login berhasil", 
+      user: { id: user.ID, email: user.EMAIL, fullName: user.FULL_NAME } 
+    });
 
-    await connection.close();
-    return NextResponse.json(
-      { message: 'Registrasi berhasil! Silakan login.' },
-      { status: 201 }
-    );
   } catch (error: any) {
-    console.error('Register error:', error);
+    console.error("DB ERROR:", error);
+    return NextResponse.json({ success: false, message: `Terjadi kesalahan server: ${error.message}` }, { status: 500 });
+  } finally {
     if (connection) await connection.close();
-    return NextResponse.json(
-      { message: error.message || 'Gagal mendaftar pengguna baru' },
-      { status: 500 }
-    );
   }
 }
