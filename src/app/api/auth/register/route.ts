@@ -9,39 +9,57 @@ function hashPassword(password: string, salt: string): string {
 export async function POST(request: Request) {
   let connection;
   try {
-    const { email, password } = await request.json();
+    const { email, password, fullName } = await request.json();
+
+    if (!email ||!password ||!fullName) {
+      return NextResponse.json(
+        { message: 'Nama lengkap, email, dan password wajib diisi' },
+        { status: 400 }
+      );
+    }
 
     const pool = await getPool();
     connection = await pool.getConnection();
 
-    const result = await connection.execute(
-      `SELECT id, name, email, password_hash, salt FROM app_users WHERE email = :email`,
-      [email.toLowerCase()]
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Cek user
+    const checkUser = await connection.execute(
+      `SELECT id FROM app_users WHERE LOWER(TRIM(email)) = :email`,
+      [cleanEmail]
     );
 
-    if (!result.rows || result.rows.length === 0) {
-      return NextResponse.json({ message: 'Email atau password salah' }, { status: 401 });
+    if (checkUser.rows && checkUser.rows.length > 0) {
+      return NextResponse.json({ message: 'Email sudah terdaftar' }, { status: 409 });
     }
 
-    const user = result.rows[0] as any[];
-    const [id, name, userEmail, passwordHash, salt] = user;
+    // Generate Salt & Hash
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = hashPassword(password, salt);
 
-    // HASH PASSWORD INPUT DENGAN SALT DARI DB
-    const inputHash = hashPassword(password, salt);
+    // Insert user baru. Pake full_name biar sama form
+    await connection.execute(
+      `INSERT INTO app_users (id, email, password_hash, salt, name, full_name, role, created_at)
+       VALUES (SYS_GUID(), :email, :passwordHash, :salt, :fullName, :fullName, 'user', SYSDATE)`,
+      {
+        email: cleanEmail, 
+        passwordHash, 
+        salt, 
+        fullName
+      },
+      { autoCommit: true }
+    );
 
-    // BANDINGKAN HASH
-    if (inputHash!== passwordHash) {
-      return NextResponse.json({ message: 'Password yang dimasukkan salah' }, { status: 401 });
-    }
-
-    return NextResponse.json({ 
-      message: 'Login berhasil', 
-      user: { id, name, email: userEmail } 
-    }, { status: 200 });
-
+    return NextResponse.json(
+      { message: 'Registrasi berhasil! Silakan login.' },
+      { status: 201 }
+    );
   } catch (error: any) {
-    console.error('Login error:', error);
-    return NextResponse.json({ message: 'Gagal login' }, { status: 500 });
+    console.error('Register error:', error);
+    return NextResponse.json(
+      { message: error.message || 'Gagal mendaftar pengguna baru' },
+      { status: 500 }
+    );
   } finally {
     if (connection) await connection.close();
   }
