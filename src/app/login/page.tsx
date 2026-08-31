@@ -1,102 +1,62 @@
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault(); // PENTING BIAR GAK REFRESH
     setLoading(true);
+    setError('');
 
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ email, password })
       });
 
       const data = await res.json();
+      console.log("RESPON:", data);
 
-      if (!res.ok ||!data.success) {
-        throw new Error(data.message || 'Email atau Password salah');
+      if (res.ok && data.success) {
+        router.push('/dashboard'); // kalau sukses langsung ke dashboard
+        router.refresh(); // paksa refresh biar cookie kebaca
+      } else {
+        setError(data.message || 'Login gagal');
       }
-
-      // 1. Simpan data user ke localStorage biar sidebar kebaca
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // 2. Redirect ke dashboard
-      router.push('/dashboard');
-      router.refresh();
-
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError('Terjadi kesalahan jaringan');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-slate-900/60 backdrop-blur-xl border-slate-800 shadow-2xl">
-        <h2 className="text-2xl font-bold text-slate-100 mb-2 text-center">Masuk ke Sistem K&B</h2>
-        <p className="text-sm text-slate-400 mb-6 text-center">Kelola arus kas, budget, dan acara organisasi</p>
-
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border-red-500/20 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
-              placeholder="nama@email.com"
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
-              placeholder="••••••••"
-              disabled={loading}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading? 'Memproses...' : 'Masuk'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-slate-400">
-          Belum punya akun?{' '}
-          <Link href="/register" className="text-cyan-400 hover:underline">
-            Daftar Akun
-          </Link>
-        </p>
-      </div>
-    </div>
+    <form onSubmit={handleLogin}>
+      <input 
+        type="email" 
+        value={email} 
+        onChange={(e) => setEmail(e.target.value)} 
+        placeholder="Email" 
+        required 
+      />
+      <input 
+        type="password" 
+        value={password} 
+        onChange={(e) => setPassword(e.target.value)} 
+        placeholder="Password" 
+        required 
+      />
+      {error && <p style={{color: 'red'}}>{error}</p>}
+      <button type="submit" disabled={loading}>
+        {loading ? 'Loading...' : 'Masuk'}
+      </button>
+    </form>
   );
 }
