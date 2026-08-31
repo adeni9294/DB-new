@@ -25,16 +25,16 @@ async function initWallet() {
     zip.extractAllTo(walletPath, true); // extract ke /tmp/wallet
   }
   
-  // kasih tau oracle dimana wallet nya
+  // PENTING: Cuma set configDir. JANGAN panggil initOracleClient
+  // biar jalan di Thin Mode
   oracledb.configDir = walletPath; 
-  oracledb.initOracleClient({ libDir: walletPath });
   walletInitialized = true;
 }
 
 export async function POST(request: Request) {
   let connection;
   try {
-    await initWallet(); // WAJIB JALANIN INI DULU
+    await initWallet(); // extract wallet dulu
 
     const { email, password } = await request.json();
 
