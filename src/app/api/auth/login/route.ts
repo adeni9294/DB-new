@@ -4,66 +4,28 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import oracledb from 'oracledb';
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import AdmZip from 'adm-zip';
-
-let walletInitialized = false;
-
-async function initWallet() {
-  if (walletInitialized) return;
-  
-  const walletPath = '/tmp/wallet';
-  if (!fs.existsSync(walletPath)) {
-    fs.mkdirSync(walletPath, { recursive: true });
-    
-    if (!process.env.WALLET_ZIP_BASE64) {
-      throw new Error("WALLET_ZIP_BASE64 environment variable not set");
-    }
-
-    const walletZipBuffer = Buffer.from(process.env.WALLET_ZIP_BASE64, 'base64');
-    const zip = new AdmZip(walletZipBuffer);
-    zip.extractAllTo(walletPath, true); // extract semua
-  }
-  
-  // AUTO CARI FOLDER YG ADA tnsnames.ora
-  let configDir = walletPath;
-  const files = fs.readdirSync(walletPath);
-  for (const file of files) {
-    const fullPath = path.join(walletPath, file);
-    if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'tnsnames.ora'))) {
-      configDir = fullPath; // contoh: /tmp/wallet/Wallet_dbhaulnew
-      break;
-    }
-  }
-  
-  console.log("Using Oracle Wallet Dir:", configDir); // cek di Vercel Logs
-  oracledb.configDir = configDir; // set ke folder yg bener
-  walletInitialized = true;
-}
 
 export async function POST(request: Request) {
   let connection;
   try {
-    await initWallet(); // extract + set configDir
-
     const { email, password } = await request.json();
 
     if (!email ||!password) {
       return NextResponse.json({ success: false, message: 'Email dan password wajib diisi' }, { status: 400 });
     }
 
-    // konek pake alias dari tnsnames.ora
+    // 1. AMBIL DARI tnsnames.ora KAMU. COPY SEMUA DARI dbhaulnew_high = SAMPE KURUNG TERAKHIR
+    const connectString = `(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-jakarta-1.oraclecloud.com))(connect_data=(service_name=gxxxxxxxxx_dbhaulnew_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))`
+
+    // 2. KONEK LANGSUNG. GAK PAKE WALLET FILE
     connection = await oracledb.getConnection({
       user: process.env.DB_USER, // ADMIN
       password: process.env.DB_PASSWORD,
-      connectString: "dbhaulnew_high" // <-- WAJIB _high
+      connectString: connectString
     });
 
     const result = await connection.execute(
-      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME 
-       FROM ADMIN.APP_USERS 
-       WHERE EMAIL = :email`,
+      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM ADMIN.APP_USERS WHERE EMAIL = :email`,
       [email],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -73,7 +35,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Email tidak ditemukan' }, { status: 401 });
     }
 
-    // cek password pake pbkdf2
     const hash = crypto.pbkdf2Sync(password, user.SALT, 1000, 32, 'sha512').toString('hex');
     if (hash!== user.PASSWORD_HASH) {
       return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
@@ -89,12 +50,6 @@ export async function POST(request: Request) {
     console.error("DB ERROR:", error);
     return NextResponse.json({ success: false, message: `Terjadi kesalahan server: ${error.message}` }, { status: 500 });
   } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error("Error closing connection:", err);
-      }
-    }
+    if (connection) await connection.close();
   }
 }
