@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Email tidak ditemukan' }, { status: 401 });
     }
 
-    const hash = crypto.pbkdf2Sync(password, user.SALT, 1000, 32, 'sha512').toString('hex');
+    const hash = crypto.pbkdf2Sync(password, user.SALT, 100000, 32, 'sha512').toString('hex');
     if (hash!== user.PASSWORD_HASH) {
       return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
     }
