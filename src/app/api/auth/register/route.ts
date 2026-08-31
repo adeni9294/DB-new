@@ -8,62 +8,41 @@ function hashPassword(password: string, salt: string): string {
 
 export async function POST(request: Request) {
   let connection;
-
   try {
-    const { email, password, fullName } = await request.json();
-
-    if (!email || !password || !fullName) {
-      return NextResponse.json(
-        { message: 'Nama lengkap, email, dan password wajib diisi' },
-        { status: 400 }
-      );
-    }
+    const { email, password } = await request.json();
 
     const pool = await getPool();
     connection = await pool.getConnection();
 
-    // Cek keberadaan user
-    const checkUser = await connection.execute(
-      `SELECT id FROM app_users WHERE email = :email`,
+    const result = await connection.execute(
+      `SELECT id, name, email, password_hash, salt FROM app_users WHERE email = :email`,
       [email.toLowerCase()]
     );
 
-    if (checkUser.rows && checkUser.rows.length > 0) {
-      return NextResponse.json(
-        { message: 'Email sudah terdaftar' },
-        { status: 400 }
-      );
+    if (!result.rows || result.rows.length === 0) {
+      return NextResponse.json({ message: 'Email atau password salah' }, { status: 401 });
     }
 
-    // Generate Salt & Hash
-    const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = hashPassword(password, salt);
+    const user = result.rows[0] as any[];
+    const [id, name, userEmail, passwordHash, salt] = user;
 
-    // Insert user baru
-    await connection.execute(
-      `INSERT INTO app_users (id, email, password_hash, salt, name, role, created_at)
-       VALUES (SYS_GUID(), :email, :passwordHash, :salt, :fullName, 'user', SYSDATE)`,
-      [email.toLowerCase(), passwordHash, salt, fullName],
-      { autoCommit: true }
-    );
+    // HASH PASSWORD INPUT DENGAN SALT DARI DB
+    const inputHash = hashPassword(password, salt);
 
-    return NextResponse.json(
-      { message: 'Registrasi berhasil! Silakan login.' },
-      { status: 201 }
-    );
+    // BANDINGKAN HASH
+    if (inputHash!== passwordHash) {
+      return NextResponse.json({ message: 'Password yang dimasukkan salah' }, { status: 401 });
+    }
+
+    return NextResponse.json({ 
+      message: 'Login berhasil', 
+      user: { id, name, email: userEmail } 
+    }, { status: 200 });
+
   } catch (error: any) {
-    console.error('Register error:', error);
-    return NextResponse.json(
-      { message: error.message || 'Gagal mendaftar pengguna baru' },
-      { status: 500 }
-    );
+    console.error('Login error:', error);
+    return NextResponse.json({ message: 'Gagal login' }, { status: 500 });
   } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error('Error closing connection:', err);
-      }
-    }
+    if (connection) await connection.close();
   }
 }
