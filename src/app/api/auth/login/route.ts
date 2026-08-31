@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getConnection } from '@/lib/db';
+import { executeQuery } from '@/lib/oracle/pool'
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
