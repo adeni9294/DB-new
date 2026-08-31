@@ -1,12 +1,13 @@
 import crypto from 'crypto';
-import { getPool } from '@/lib/oracle/pool'; // PAKAI INI
+import oracledb from 'oracledb';
+import { getPool } from '@/lib/oracle/pool';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
     const pool = await getPool();
-    const connection = await pool.getConnection(); // ambil dari pool
+    const connection = await pool.getConnection();
 
     const result = await connection.execute(
       `SELECT id, name, email, password_hash, salt FROM app_users WHERE LOWER(email) = :email`,
@@ -21,7 +22,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Email tidak ditemukan' }, { status: 401 });
     }
 
-    // HASH PAKE SALT DARI DB
     const saltFromDb = user.SALT;
     const hash = crypto.pbkdf2Sync(password, saltFromDb, 100000, 32, 'sha512').toString('hex');
 
