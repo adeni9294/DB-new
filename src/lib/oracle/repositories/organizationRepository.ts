@@ -18,6 +18,24 @@ export interface OrganizationDetail {
   members: OrgMemberNode[];
 }
 
+// Type buat hasil DB
+type DbOrgRow = {
+  id: string;
+  name: string;
+  description: string;
+  total_events: number;
+  total_members: number;
+}
+
+type DbMemberRow = {
+  member_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  position_title: string;
+  level_order: number;
+}
+
 export async function getOrganizationStructure(organizationId: string): Promise<OrganizationDetail | null> {
   // Query Metadata Organisasi & Aggregasi
   const orgSql = `
@@ -31,7 +49,7 @@ export async function getOrganizationStructure(organizationId: string): Promise<
     WHERE o.id = :organizationId
   `;
   
-  const orgRows = await executeQuery<any>(orgSql, { organizationId });
+  const orgRows = await executeQuery(orgSql, { organizationId }) as DbOrgRow[]; // HAPUS <any>
   if (orgRows.length === 0) return null;
 
   const org = orgRows[0];
@@ -52,21 +70,21 @@ export async function getOrganizationStructure(organizationId: string): Promise<
     ORDER BY p.level_order ASC, u.name ASC
   `;
 
-  const memberRows = await executeQuery<any>(memberSql, { organizationId });
+  const memberRows = await executeQuery(memberSql, { organizationId }) as DbMemberRow[]; // HAPUS <any>
 
   return {
-    id: org.ID,
-    name: org.NAME,
-    description: org.DESCRIPTION,
-    totalEvents: Number(org.TOTAL_EVENTS),
-    totalMembers: Number(org.TOTAL_MEMBERS),
+    id: org.id, // GANTI JADI lowercase
+    name: org.name,
+    description: org.description,
+    totalEvents: Number(org.total_events),
+    totalMembers: Number(org.total_members),
     members: memberRows.map((m) => ({
-      memberId: m.MEMBER_ID,
-      userId: m.USER_ID,
-      userName: m.USER_NAME,
-      userEmail: m.USER_EMAIL,
-      positionTitle: m.POSITION_TITLE,
-      levelOrder: Number(m.LEVEL_ORDER),
+      memberId: m.member_id, // lowercase
+      userId: m.user_id,
+      userName: m.user_name,
+      userEmail: m.user_email,
+      positionTitle: m.position_title,
+      levelOrder: Number(m.level_order),
     })),
   };
 }
