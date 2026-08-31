@@ -24,12 +24,17 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.message || 'Gagal login');
+      if (!res.ok ||!data.success) {
+        throw new Error(data.message || 'Email atau Password salah');
       }
 
-      router.push('/');
+      // 1. Simpan data user ke localStorage biar sidebar kebaca
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // 2. Redirect ke dashboard
+      router.push('/dashboard');
       router.refresh();
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -39,12 +44,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-slate-800 shadow-2xl">
+      <div className="w-full max-w-md p-8 rounded-2xl bg-slate-900/60 backdrop-blur-xl border-slate-800 shadow-2xl">
         <h2 className="text-2xl font-bold text-slate-100 mb-2 text-center">Masuk ke Sistem K&B</h2>
         <p className="text-sm text-slate-400 mb-6 text-center">Kelola arus kas, budget, dan acara organisasi</p>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border-red-500/20 text-red-400 text-sm">
             {error}
           </div>
         )}
@@ -56,9 +61,10 @@ export default function LoginPage() {
               type="email"
               required
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => setFormData({...formData, email: e.target.value })}
               className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
               placeholder="nama@email.com"
+              disabled={loading}
             />
           </div>
 
@@ -68,18 +74,19 @@ export default function LoginPage() {
               type="password"
               required
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
+              onChange={(e) => setFormData({...formData, password: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
               placeholder="••••••••"
+              disabled={loading}
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition duration-200 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Memproses...' : 'Masuk'}
+            {loading? 'Memproses...' : 'Masuk'}
           </button>
         </form>
 
