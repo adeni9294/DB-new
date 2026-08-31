@@ -14,10 +14,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Email dan password wajib diisi' }, { status: 400 });
     }
 
-    // 1. AMBIL DARI tnsnames.ora KAMU. COPY SEMUA DARI dbhaulnew_high = SAMPE KURUNG TERAKHIR
-    const connectString = `(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-jakarta-1.oraclecloud.com))(connect_data=(service_name=gxxxxxxxxx_dbhaulnew_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))`
+    // INI STRING DARI tnsnames.ora KAMU
+    const connectString = `(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-batam-1.oraclecloud.com))(connect_data=(service_name=gfc40edfb77a0d0_dbhaulnew_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))`
 
-    // 2. KONEK LANGSUNG. GAK PAKE WALLET FILE
     connection = await oracledb.getConnection({
       user: process.env.DB_USER, // ADMIN
       password: process.env.DB_PASSWORD,
@@ -25,7 +24,9 @@ export async function POST(request: Request) {
     });
 
     const result = await connection.execute(
-      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM ADMIN.APP_USERS WHERE EMAIL = :email`,
+      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME
+       FROM ADMIN.APP_USERS
+       WHERE EMAIL = :email`,
       [email],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -40,16 +41,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: "Login berhasil", 
-      user: { id: user.ID, email: user.EMAIL, fullName: user.FULL_NAME } 
+    return NextResponse.json({
+      success: true,
+      message: "Login berhasil",
+      user: { id: user.ID, email: user.EMAIL, fullName: user.FULL_NAME }
     });
 
   } catch (error: any) {
     console.error("DB ERROR:", error);
     return NextResponse.json({ success: false, message: `Terjadi kesalahan server: ${error.message}` }, { status: 500 });
   } finally {
-    if (connection) await connection.close();
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error("Error closing connection:", err);
+      }
+    }
   }
 }
