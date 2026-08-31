@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import oracledb from 'oracledb';
 import crypto from 'crypto';
 import fs from 'fs';
+import path from 'path';
 import AdmZip from 'adm-zip';
 
 let walletInitialized = false;
@@ -22,19 +23,29 @@ async function initWallet() {
 
     const walletZipBuffer = Buffer.from(process.env.WALLET_ZIP_BASE64, 'base64');
     const zip = new AdmZip(walletZipBuffer);
-    zip.extractAllTo(walletPath, true); // extract ke /tmp/wallet
+    zip.extractAllTo(walletPath, true); // extract semua
   }
   
-  // PENTING: Cuma set configDir. JANGAN panggil initOracleClient
-  // biar jalan di Thin Mode
-  oracledb.configDir = walletPath; 
+  // AUTO CARI FOLDER YG ADA tnsnames.ora
+  let configDir = walletPath;
+  const files = fs.readdirSync(walletPath);
+  for (const file of files) {
+    const fullPath = path.join(walletPath, file);
+    if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'tnsnames.ora'))) {
+      configDir = fullPath; // contoh: /tmp/wallet/Wallet_dbhaulnew
+      break;
+    }
+  }
+  
+  console.log("Using Oracle Wallet Dir:", configDir); // cek di Vercel Logs
+  oracledb.configDir = configDir; // set ke folder yg bener
   walletInitialized = true;
 }
 
 export async function POST(request: Request) {
   let connection;
   try {
-    await initWallet(); // extract wallet dulu
+    await initWallet(); // extract + set configDir
 
     const { email, password } = await request.json();
 
@@ -42,11 +53,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Email dan password wajib diisi' }, { status: 400 });
     }
 
-    // konek pake alias dari tnsnames.ora di dalam wallet
+    // konek pake alias dari tnsnames.ora
     connection = await oracledb.getConnection({
       user: process.env.DB_USER, // ADMIN
       password: process.env.DB_PASSWORD,
-      connectString: "dbhaulnew_high" // <-- PENTING: pake _high
+      connectString: "dbhaulnew_high" // <-- WAJIB _high
     });
 
     const result = await connection.execute(
