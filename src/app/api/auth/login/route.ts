@@ -1,48 +1,50 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 import oracledb from 'oracledb';
-import { getPool } from '@/lib/oracle/pool';
+import crypto from 'crypto';
 
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha512').toString('hex'); // SAMA PERSIS
-}
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   let connection;
   try {
-    const { email, password } = await req.json();
-    const pool = await getPool();
-    connection = await pool.getConnection();
+    const { email, password } = await request.json();
+
+    connection = await oracledb.getConnection();
 
     const result = await connection.execute(
-      `SELECT id, name, email, password_hash, salt FROM app_users WHERE LOWER(TRIM(email)) = :email`,
-      [email.toLowerCase().trim()],
+      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM app_users WHERE EMAIL = :email`,
+      [email],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
 
-    await connection.close();
+    const user = result.rows?.[0] as any;
 
-    const user = result.rows?.[0];
     if (!user) {
-      return NextResponse.json({ message: 'Email tidak ditemukan' }, { status: 401 });
+      return NextResponse.json({ success: false, message: 'Email tidak ditemukan' }, { status: 401 });
     }
 
-    // HASH PAKE SALT DARI DB
-    const saltFromDb = user.SALT;
-    const hash = hashPassword(password, saltFromDb);
+    // Hash password input pake salt dari DB
+    const hash = crypto.pbkdf2Sync(password, user.SALT, 1000, 32, 'sha512').toString('hex');
 
     if (hash!== user.PASSWORD_HASH) {
-      return NextResponse.json({ message: 'Password yang dimasukkan salah' }, { status: 401 });
+      return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
     }
 
-    return NextResponse.json({ 
-      message: 'Login berhasil', 
-      user: { id: user.ID, email: user.EMAIL, name: user.NAME } 
+    // SUKSES - balikin data user
+    return NextResponse.json({
+      success: true,
+      message: "Login berhasil",
+      user: {
+        id: user.ID,
+        email: user.EMAIL,
+        fullName: user.FULL_NAME
+      }
     });
 
   } catch (error: any) {
-    console.error('Login error:', error);
-    if (connection) await connection.close();
-    return NextResponse.json({ message: 'Server Error: ' + error.message }, { status: 500 });
+    console.error(error);
+    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server' }, { status: 500 });
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
   }
 }
