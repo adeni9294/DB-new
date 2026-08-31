@@ -2,17 +2,15 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getPool } from '@/lib/oracle/pool';
 
-function hashPassword(password: string): string {
-  return crypto.pbkdf2Sync(password, 'static_salt', 1000, 32, 'sha512').toString('hex');
+function hashPassword(password: string, salt: string): string { // <-- TAMBAH PARAM SALT
+  return crypto.pbkdf2Sync(password, salt, 1000, 32, 'sha512').toString('hex');
 }
 
 export async function POST(request: Request) {
   let connection;
-
   try {
     const { email, password } = await request.json();
-
-    if (!email || !password) {
+    if (!email ||!password) {
       return NextResponse.json({ message: 'Email dan password wajib diisi' }, { status: 400 });
     }
 
@@ -22,10 +20,11 @@ export async function POST(request: Request) {
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPassword = String(password).trim();
 
+    // 1. SELECT SALT JUGA
     const result = await connection.execute(
-      `SELECT id, email, password_hash, name, role 
+      `SELECT id, email, password_hash, salt, name, role 
        FROM app_users 
-       WHERE LOWER(TRIM(email)) = :email`,
+       WHERE LOWER(TRIM(email)) = :email`, // pake bind biar aman
       [cleanEmail]
     );
 
@@ -36,31 +35,28 @@ export async function POST(request: Request) {
     const rowData = result.rows[0] as any[];
     const userId = rowData[0];
     const userEmail = rowData[1];
-    const rawStoredHash = String(rowData[2] || '');
-    const userName = rowData[3];
-    const userRole = rowData[4];
+    const storedHash = String(rowData[2] || '').trim().toLowerCase(); // jangan di slice
+    const salt = String(rowData[3] || '').trim(); // <-- AMBIL SALT DARI DB
+    const userName = rowData[4];
+    const userRole = rowData[5];
 
-    // Ambil 64 karakter pertama dari masing-masing hash untuk menghindari isu trailing space Oracle
-    const storedHash = rawStoredHash.replace(/[^a-fA-F0-9]/g, '').toLowerCase().slice(0, 64);
-    const inputHash = hashPassword(cleanPassword).replace(/[^a-fA-F0-9]/g, '').toLowerCase().slice(0, 64);
+    // 2. HASH PAKE SALT DARI DB
+    const inputHash = hashPassword(cleanPassword, salt).toLowerCase();
 
-    if (inputHash !== storedHash) {
+    if (inputHash!== storedHash) {
       return NextResponse.json({ message: 'Password yang dimasukkan salah' }, { status: 401 });
     }
 
+    //... sisa kode session kamu sama
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    try {
-      await connection.execute(
-        `INSERT INTO app_user_sessions (id, user_id, session_token, expires_at)
-         VALUES (SYS_GUID(), :userId, :sessionToken, :expiresAt)`,
-        [userId, sessionToken, expiresAt],
-        { autoCommit: true }
-      );
-    } catch (sessionErr: any) {
-      console.error('Session Insert Warning:', sessionErr);
-    }
+    await connection.execute(
+      `INSERT INTO app_user_sessions (id, user_id, session_token, expires_at)
+       VALUES (SYS_GUID(), :userId, :sessionToken, :expiresAt)`,
+      [userId, sessionToken, expiresAt],
+      { autoCommit: true }
+    );
 
     const response = NextResponse.json({
       success: true,
@@ -79,17 +75,8 @@ export async function POST(request: Request) {
     return response;
   } catch (error: any) {
     console.error('Login Error:', error);
-    return NextResponse.json(
-      { message: error.message || 'Terjadi kesalahan pada server' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Terjadi kesalahan pada server' }, { status: 500 });
   } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error('Error closing connection:', err);
-      }
-    }
+    if (connection) await connection.close();
   }
 }
