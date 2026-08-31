@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -9,8 +9,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // KALO UDAH LOGIN, LANGSUNG KE DASHBOARD
+  useEffect(() => {
+    const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
+    if (userCookie) {
+      router.push('/dashboard');
+    }
+  }, [router]);
+
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); // PENTING BIAR GAK REFRESH
+    e.preventDefault();
     setLoading(true);
     setError('');
 
@@ -22,10 +30,9 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
-      console.log("RESPON:", data);
 
       if (res.ok && data.success) {
-        router.push('/dashboard'); // kalau sukses langsung ke dashboard
+        router.push('/dashboard');
         router.refresh(); // paksa refresh biar cookie kebaca
       } else {
         setError(data.message || 'Login gagal');
@@ -38,25 +45,34 @@ export default function LoginPage() {
   };
 
   return (
-    <form onSubmit={handleLogin}>
-      <input 
-        type="email" 
-        value={email} 
-        onChange={(e) => setEmail(e.target.value)} 
-        placeholder="Email" 
-        required 
-      />
-      <input 
-        type="password" 
-        value={password} 
-        onChange={(e) => setPassword(e.target.value)} 
-        placeholder="Password" 
-        required 
-      />
-      {error && <p style={{color: 'red'}}>{error}</p>}
-      <button type="submit" disabled={loading}>
-        {loading ? 'Loading...' : 'Masuk'}
-      </button>
-    </form>
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
+      <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4 rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
+        <h1 className="text-2xl font-bold text-white text-center">Login K&B</h1>
+        {error && <p className="text-rose-400 text-sm text-center">{error}</p>}
+        <input 
+          type="email" 
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)} 
+          placeholder="Email" 
+          required 
+          className="w-full bg-slate-950 border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100"
+        />
+        <input 
+          type="password" 
+          value={password} 
+          onChange={(e) => setPassword(e.target.value)} 
+          placeholder="Password" 
+          required 
+          className="w-full bg-slate-950 border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100"
+        />
+        <button 
+          type="submit" 
+          disabled={loading}
+          className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-xl disabled:opacity-50"
+        >
+          {loading? 'Loading...' : 'Masuk'}
+        </button>
+      </form>
+    </div>
   );
 }
