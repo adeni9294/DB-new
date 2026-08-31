@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getPool } from '@/lib/oracle/pool';
 
-function hashPassword(password: string, salt: string): string { // <-- TAMBAH PARAM SALT
+function hashPassword(password: string, salt: string): string {
   return crypto.pbkdf2Sync(password, salt, 1000, 32, 'sha512').toString('hex');
 }
 
@@ -20,11 +20,11 @@ export async function POST(request: Request) {
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPassword = String(password).trim();
 
-    // 1. SELECT SALT JUGA
+    // SELECT pake full_name biar konsisten
     const result = await connection.execute(
-      `SELECT id, email, password_hash, salt, name, role 
+      `SELECT id, email, password_hash, salt, full_name, role 
        FROM app_users 
-       WHERE LOWER(TRIM(email)) = :email`, // pake bind biar aman
+       WHERE LOWER(TRIM(email)) = :email`,
       [cleanEmail]
     );
 
@@ -35,19 +35,19 @@ export async function POST(request: Request) {
     const rowData = result.rows[0] as any[];
     const userId = rowData[0];
     const userEmail = rowData[1];
-    const storedHash = String(rowData[2] || '').trim().toLowerCase(); // jangan di slice
-    const salt = String(rowData[3] || '').trim(); // <-- AMBIL SALT DARI DB
-    const userName = rowData[4];
+    const storedHash = String(rowData[2] || '').trim().toLowerCase();
+    const salt = String(rowData[3] || '').trim();
+    const userName = rowData[4]; // ini full_name
     const userRole = rowData[5];
 
-    // 2. HASH PAKE SALT DARI DB
+    // HASH PAKE SALT DARI DB
     const inputHash = hashPassword(cleanPassword, salt).toLowerCase();
 
     if (inputHash!== storedHash) {
       return NextResponse.json({ message: 'Password yang dimasukkan salah' }, { status: 401 });
     }
 
-    //... sisa kode session kamu sama
+    // Buat session
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     return response;
   } catch (error: any) {
     console.error('Login Error:', error);
-    return NextResponse.json({ message: 'Terjadi kesalahan pada server' }, { status: 500 });
+    return NextResponse.json({ message: error.message }, { status: 500 }); // kirim error asli buat debug
   } finally {
     if (connection) await connection.close();
   }
