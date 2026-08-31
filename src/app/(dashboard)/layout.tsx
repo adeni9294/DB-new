@@ -1,16 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Calendar, 
-  LogOut, 
-  User, 
-  Settings 
+import {
+  LayoutDashboard,
+  Wallet,
+  Calendar,
+  LogOut,
+  User,
+  Settings
 } from 'lucide-react';
+
+type User = {
+  id: number;
+  email: string;
+  fullName: string;
+  role?: string;
+}
 
 export default function DashboardLayout({
   children,
@@ -19,6 +26,16 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    } else {
+      router.push('/login');
+    }
+  }, [router]);
 
   const menuItems = [
     { name: 'Ringkasan', href: '/dashboard', icon: LayoutDashboard },
@@ -29,20 +46,20 @@ export default function DashboardLayout({
 
   const handleLogout = () => {
     if (confirm('Apakah Anda yakin ingin keluar?')) {
-      // Di sini Anda bisa menambahkan logika hapus token/session (misal: localStorage.removeItem)
-      // Contoh mengarahkan kembali ke halaman login atau home:
-      router.push('/login'); 
+      localStorage.removeItem('user');
+      router.push('/login');
     }
   };
 
+  if (!user) return null;
+
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100 font-sans">
-      {/* Sidebar Navigasi */}
-      <aside className="w-full md:w-64 bg-slate-900/60 border-r border-slate-800/80 p-6 flex flex-col justify-between backdrop-blur-xl shrink-0">
+    <div className="min-h-screen bg-slate-950 flex-col md:flex-row text-slate-100 font-sans">
+      <aside className="w-full md:w-64 bg-slate-900/60 border-r border-slate-800/80 p-6 flex-col justify-between backdrop-blur-xl shrink-0">
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-2">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-slate-950 shadow-lg shadow-cyan-500/20">
-              K
+              {user.fullName?.charAt(0).toUpperCase() || 'K'}
             </div>
             <div>
               <span className="text-base font-bold text-white block">Sistem K&B</span>
@@ -60,11 +77,11 @@ export default function DashboardLayout({
                   href={item.href}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm'
+                     ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 ${isActive? 'text-cyan-400' : 'text-slate-400'}`} />
                   {item.name}
                 </Link>
               );
@@ -72,28 +89,26 @@ export default function DashboardLayout({
           </nav>
         </div>
 
-        {/* Profil & Tombol Logout */}
         <div className="pt-6 border-t border-slate-800/80 space-y-4">
-          <div className="flex items-center gap-3 px-2 py-1.5 bg-slate-950/40 border border-slate-800/60 rounded-xl">
+          <div className="flex items-center gap-3 px-2 py-1.5 bg-slate-950/40 border-slate-800/60 rounded-xl">
             <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center text-cyan-400 font-semibold text-sm">
               <User className="w-4 h-4" />
             </div>
             <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-slate-200 truncate">Administrator</p>
-              <p className="text-[11px] text-slate-400 truncate">admin@kandb.com</p>
+              <p className="text-xs font-semibold text-slate-200 truncate">{user.fullName}</p>
+              <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
             </div>
           </div>
 
-          <button 
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-medium text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-medium text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/20 transition-all cursor-pointer"
           >
             <LogOut className="w-4 h-4" /> Keluar (Logout)
           </button>
         </div>
       </aside>
 
-      {/* Konten Halaman */}
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
