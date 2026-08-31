@@ -9,10 +9,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // KALO UDAH LOGIN, LANGSUNG KE DASHBOARD
   useEffect(() => {
-    const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
-    if (userCookie) {
+    const user = localStorage.getItem('user');
+    if (user) {
       router.push('/dashboard');
     }
   }, [router]);
@@ -32,8 +31,8 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
+        localStorage.setItem('user', JSON.stringify(data.user)); // SIMPAN KE LOCALSTORAGE
         router.push('/dashboard');
-        router.refresh(); // paksa refresh biar cookie kebaca
       } else {
         setError(data.message || 'Login gagal');
       }
@@ -63,7 +62,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)} 
           placeholder="Password" 
           required 
-          className="w-full bg-slate-950 border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100"
         />
         <button 
           type="submit" 
