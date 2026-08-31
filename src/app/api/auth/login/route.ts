@@ -40,22 +40,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
     }
 
-    const res = NextResponse.json({ 
+    // GAK PAKE COOKIE LAGI. LANGSUNG KIRIM DATA USER
+    return NextResponse.json({ 
       success: true, 
       message: "Login berhasil", 
       user: { id: user.ID, email: user.EMAIL, fullName: user.FULL_NAME } 
     });
-
-    // KUNCI: httpOnly false biar bisa dibaca di frontend
-    res.cookies.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL, name: user.FULL_NAME }), {
-      httpOnly: false, 
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 hari
-    });
-
-    return res;
 
   } catch (error: any) {
     console.error("DB ERROR:", error);
