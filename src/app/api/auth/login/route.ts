@@ -19,10 +19,10 @@ export async function POST(req: Request) {
   const isValid = await bcrypt.compare(password, user.PASSWORD_HASH)
   if (!isValid) return NextResponse.json({ error: 'Password salah' }, { status: 401 })
 
-  const cookieStore = await cookies()
+  const cookieStore = await cookies() // <-- PAKAI INI
   cookieStore.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL, name: user.FULL_NAME }), {
-    httpOnly: true,
-    secure: true, // WAJIB TRUE DI VERCEL
+    httpOnly: true, // <-- INI WAJIB TRUE
+    secure: true,
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7
