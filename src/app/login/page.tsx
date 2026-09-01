@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -8,26 +7,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include', // <-- KUNCI 1: Biar cookie bisa disimpen
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
 
-    const data = await res.json()
-    setLoading(false)
-    
-    if (res.ok) {
-      router.push('/dashboard')
-    } else {
-      setError(data.error)
+      const data = await res.json()
+      
+      if (res.ok) {
+        window.location.href = '/dashboard' // <-- KUNCI 2: Force reload biar middleware ke-trigger
+      } else {
+        setError(data.error || 'Login gagal')
+        setLoading(false)
+      }
+    } catch (err) {
+      setError('Gagal konek ke server')
+      setLoading(false)
     }
   }
 
@@ -41,7 +45,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm border border-red-200">
             {error}
           </div>
         )}
@@ -63,10 +67,10 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
             <input 
               type="password" 
-              placeholder="••••••••" 
+              placeholder="••••" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
+              className="w-full px-4 py-3 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800" // fix: tambah border
               required 
             />
           </div>

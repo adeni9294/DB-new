@@ -8,18 +8,11 @@ export default async function DashboardPage() {
   const cookieStore = await cookies()
   const userCookie = cookieStore.get('user')
 
-  // Kalau gak ada cookie langsung tendang ke login. Gak pake loading
   if (!userCookie) {
     redirect('/login')
   }
 
-  let user: User
-  try {
-    user = JSON.parse(userCookie.value)
-  } catch {
-    redirect('/login')
-  }
+  const user: User = JSON.parse(userCookie.value)
   
-  // Lempar user ke Client Component
   return <DashboardClient user={user} />
 }
