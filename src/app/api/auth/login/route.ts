@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs' // ini udah bener
+import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
-import { db } from '@/lib/db'
+import { executeQuery } from '@/lib/oracle/pool' // <-- INI
 
 export async function POST(req: Request) {
   const { email, password } = await req.json()
   
-  //... ambil user dari db
-  
-  const isValid = await bcrypt.compare(password, user.PASSWORD)
+  // Ambil user dari oracle
+  const users = await executeQuery(
+    `SELECT ID, EMAIL, FULL_NAME, PASSWORD_HASH FROM USERS WHERE EMAIL = :1`,
+    [email]
+  )
+
+  const user = users[0]
+  if (!user) return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 401 })
+
+  const isValid = await bcrypt.compare(password, user.PASSWORD_HASH)
   if (!isValid) return NextResponse.json({ error: 'Password salah' }, { status: 401 })
 
   const res = NextResponse.json({ success: true })
