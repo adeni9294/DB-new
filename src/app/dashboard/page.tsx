@@ -10,7 +10,7 @@ export default async function DashboardPage() {
     redirect('/login') // kalau gak ada cookie, tendang ke login
   }
 
-  const user = JSON.parse(decodeURIComponent(userCookie.value))
+const user = JSON.parse(userCookie.value)
   
   return <DashboardClient user={user} /> // lempar ke client component
 }
