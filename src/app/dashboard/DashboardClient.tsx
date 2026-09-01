@@ -33,12 +33,12 @@ export default function DashboardClient({ user }: { user: User }) {
     budgetUsedPercent: 68.2
   };
 
-  const budgetProgress = {
+  const budgetProgress = [
     { category: 'Makanan & Minuman', used: 70, status: 'safe' },
     { category: 'Transportasi', used: 45, status: 'safe' },
     { category: 'Kas Organisasi K&B', used: 82, status: 'warning' },
     { category: 'Acara Seminar Kit', used: 104, status: 'danger' }
-};
+  ];
 
   return (
     <div className="space-y-8 p-6 text-slate-100 font-sans relative bg-slate-950 min-h-screen">
@@ -48,37 +48,23 @@ export default function DashboardClient({ user }: { user: User }) {
           <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">
             Halo, {user.name} 👋
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Pantau arus kas, budget, organisasi, dan acara dalam satu tampilan.
-          </p>
+          <p className="text-slate-400 text-sm mt-1">Pantau arus kas, budget, organisasi, dan acara dalam satu tampilan.</p>
         </div>
 
         <div className="flex flex-wrap gap-2 relative z-10">
-          <button
-            onClick={() => setActiveModal('pemasukan')}
-            className="flex items-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-3 py-2 rounded-xl"
-          >
+          <button onClick={() => setActiveModal('pemasukan')} className="flex items-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-3 py-2 rounded-xl">
             <PlusCircle className="w-4 h-4" /> Pemasukan
           </button>
 
-          <button
-            onClick={() => setActiveModal('pengeluaran')}
-            className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl"
-          >
+          <button onClick={() => setActiveModal('pengeluaran')} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl">
             <PlusCircle className="w-4 h-4" /> Pengeluaran
           </button>
 
-          <button
-            onClick={() => setActiveModal('acara')}
-            className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium"
-          >
+          <button onClick={() => setActiveModal('acara')} className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium">
             <Calendar className="w-4 h-4 text-cyan-400" /> Acara Baru
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium transition-all"
-          >
+          <button onClick={handleLogout} className="flex items-center gap-2 bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium transition-all">
             <LogOut className="w-4 h-4" /> Keluar
           </button>
         </div>
@@ -143,5 +129,65 @@ export default function DashboardClient({ user }: { user: User }) {
                     <span className="text-slate-400">{b.used}%</span>
                   </div>
                   <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                    <div className={`${statusColor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.min(b.used, 100)}`*](#)
-
+                    <div className={`${statusColor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.min(b.used, 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-6 rounded-2xl bg-slate-900/60 border-slate-800/80 backdrop-blur-xl shadow-xl space-y-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-cyan-400" /> Agenda & Task Hari Ini
+          </h2>
+          <div className="space-y-3">
+            <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 mt-2" />
+              <div>
+                <p className="text-sm font-semibold text-white">Rapat Koordinasi</p>
+                <p className="text-xs text-slate-400">10:00 - 11:30</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-start gap-3">
+              <div className="w-2 h-2 rounded-full bg-amber-400 mt-2" />
+              <div>
+                <p className="text-sm font-semibold text-white">Penutupan Donasi</p>
+                <p className="text-xs text-slate-400">Sampai 17 Sep 2026</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pop-up Modal */}
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-white capitalize mb-4">Tambah {activeModal}</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                alert(`Data ${activeModal} berhasil disimpan!`);
+                setActiveModal(null);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-sm text-slate-400">Judul</label>
+                <input className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm" />
+              </div>
+              <div className="flex justify-end">
+                <button type="submit" className="px-4 py-2 rounded-lg bg-cyan-500 text-white">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
