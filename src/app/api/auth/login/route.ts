@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic' // <-- JANGAN DI BUILD
-export const runtime = 'nodejs' // <-- WAJIB PAKE NODE BUKAN EDGE
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
