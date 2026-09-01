@@ -1,11 +1,23 @@
+export const dynamic = 'force-dynamic'; // Tambahin ini juga
+
 import { NextResponse } from 'next/server';
 import { createTransaction } from '@/lib/oracle/repositories/transactionRepository';
+import { executeQuery } from '@/lib/oracle/pool'; // buat GET
+
+export async function GET() {
+  try {
+    const sql = `SELECT * FROM transactions ORDER BY created_at DESC`;
+    const result = await executeQuery(sql);
+    return NextResponse.json(result);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Validasi input sederhana
     if (!body.amount || !body.accountId || !body.type) {
       return NextResponse.json(
         { error: 'Field nominal, akun, dan tipe transaksi wajib diisi.' },
@@ -13,7 +25,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Simulasi UserId dari session
     const mockUserId = 'USER-001';
 
     const trxId = await createTransaction({
