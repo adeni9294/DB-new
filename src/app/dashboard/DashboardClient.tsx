@@ -33,12 +33,12 @@ export default function DashboardClient({ user }: { user: User }) {
     budgetUsedPercent: 68.2
   };
 
-  const budgetProgress = [
+  const budgetProgress = {
     { category: 'Makanan & Minuman', used: 70, status: 'safe' },
     { category: 'Transportasi', used: 45, status: 'safe' },
     { category: 'Kas Organisasi K&B', used: 82, status: 'warning' },
     { category: 'Acara Seminar Kit', used: 104, status: 'danger' }
-  ];
+};
 
   return (
     <div className="space-y-8 p-6 text-slate-100 font-sans relative bg-slate-950 min-h-screen">
