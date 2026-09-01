@@ -12,6 +12,8 @@ export default function DashboardClient({ user }: { user: User }) {
   const [activeModal, setActiveModal] = useState<'pemasukan' | 'pengeluaran' | 'acara' | null>(null);
 
   const handleLogout = async () => {
+    // remove localStorage so client layout won't be stuck
+    try { localStorage.removeItem('user') } catch (e) { /* ignore */ }
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     window.location.href = '/login'; // pake ini biar middleware ke reset
   }
@@ -45,16 +47,16 @@ export default function DashboardClient({ user }: { user: User }) {
         </div>
 
         <div className="flex flex-wrap gap-2 relative z-10">
-          <button onClick={() => setActiveModal('pemasukan')} className="flex items-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-3 py-2 rounded-xl text-sm font-medium transition-all backdrop-blur-md cursor-pointer">
+          <button onClick={() => setActiveModal('pemasukan')} className="flex items-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-3 py-2 rounded-xl te[...]
             <PlusCircle className="w-4 h-4" /> Pemasukan
           </button>
-          <button onClick={() => setActiveModal('pengeluaran')} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl text-sm font-medium transition-all backdrop-blur-md cursor-pointer">
+          <button onClick={() => setActiveModal('pengeluaran')} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl [...]
             <PlusCircle className="w-4 h-4" /> Pengeluaran
           </button>
-          <button onClick={() => setActiveModal('acara')} className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer">
+          <button onClick={() => setActiveModal('acara')} className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medi[...]
             <Calendar className="w-4 h-4 text-cyan-400" /> Acara Baru
           </button>
-          <button onClick={handleLogout} className="flex items-center gap-2 bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer text-rose-400">
+          <button onClick={handleLogout} className="flex items-center gap-2 bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium transition-all [...]
             <LogOut className="w-4 h-4" /> Keluar
           </button>
         </div>
@@ -68,19 +70,19 @@ export default function DashboardClient({ user }: { user: User }) {
           <span className="text-xs text-emerald-400 flex items-center gap-1 mt-2"><ArrowUpRight className="w-3 h-3" /> +4.2% dari bulan lalu</span>
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border-slate-800/80 backdrop-blur-xl shadow-xl hover:border-slate-700/60 transition-all">
-          <div className="flex justify-between items-center text-slate-400 mb-2"><span className="text-sm font-medium">Pemasukan Bulan Ini</span><TrendingUp className="w-5 h-5 text-emerald-400" /></div>
+          <div className="flex justify-between items-center text-slate-400 mb-2"><span className="text-sm font-medium">Pemasukan Bulan Ini</span><TrendingUp className="w-5 h-5 text-emerald-400" />[...]
           <p className="text-2xl font-extrabold text-white">Rp {financialSummary.incomeThisMonth.toLocaleString('id-ID')}</p>
           <span className="text-xs text-slate-400 mt-2 block">Gaji + Sponsorship Acara</span>
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border-slate-800/80 backdrop-blur-xl shadow-xl hover:border-slate-700/60 transition-all">
-          <div className="flex justify-between items-center text-slate-400 mb-2"><span className="text-sm font-medium">Pengeluaran Bulan Ini</span><TrendingDown className="w-5 h-5 text-rose-400" /></div>
+          <div className="flex justify-between items-center text-slate-400 mb-2"><span className="text-sm font-medium">Pengeluaran Bulan Ini</span><TrendingDown className="w-5 h-5 text-rose-400" /[...]
           <p className="text-2xl font-extrabold text-white">Rp {financialSummary.expenseThisMonth.toLocaleString('id-ID')}</p>
           <span className="text-xs text-slate-400 mt-2 block">Personal & Operasional</span>
         </div>
         <div className="p-5 rounded-2xl bg-slate-900/60 border-slate-800/80 backdrop-blur-xl shadow-xl hover:border-slate-700/60 transition-all">
           <div className="flex justify-between items-center text-slate-400 mb-2"><span className="text-sm font-medium">Sisa Budget Aktif</span><PieChart className="w-5 h-5 text-amber-400" /></div>
           <p className="text-2xl font-extrabold text-white">Rp {financialSummary.remainingBudget.toLocaleString('id-ID')}</p>
-          <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden"><div className="bg-cyan-400 h-full rounded-full" style={{ width: `${financialSummary.budgetUsedPercent}%` }}/></div>
+          <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden"><div className="bg-cyan-400 h-full rounded-full" style={{ width: `${financialSummary.budgetUsedPercent}%` }}/[...]
         </div>
       </div>
 
@@ -94,7 +96,7 @@ export default function DashboardClient({ user }: { user: User }) {
               return (
                 <div key={idx} className="space-y-1.5">
                   <div className="flex justify-between text-sm"><span className="text-slate-300 font-medium">{b.category}</span><span className="text-slate-400">{b.used}%</span></div>
-                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden"><div className={`h-full rounded-full ${statusColor} transition-all duration-500`} style={{ width: `${Math.min(b.used, 100)}%` }}/></div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden"><div className={`h-full rounded-full ${statusColor} transition-all duration-500`} style={{ width: `${Math.[...]
                 </div>
               );
             })}
@@ -103,8 +105,8 @@ export default function DashboardClient({ user }: { user: User }) {
         <div className="p-6 rounded-2xl bg-slate-900/60 border-slate-800/80 backdrop-blur-xl shadow-xl space-y-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><CheckSquare className="w-5 h-5 text-cyan-400" /> Agenda & Task Hari Ini</h2>
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-start gap-3"><div className="w-2 h-2 rounded-full bg-cyan-400 mt-2" /><div><p className="text-sm font-semibold text-slate-200">Rapat Panitia Seminar</p><p className="text-xs text-slate-400">19:30 WIB • Ruang Utama Org</p></div></div>
-            <div className="p-3 rounded-xl bg-slate-800/40 border-slate-700/40 flex items-start gap-3"><div className="w-2 h-2 rounded-full bg-amber-400 mt-2" /><div><p className="text-sm font-semibold text-slate-200">Bayar Domain & Workspace</p><p className="text-xs text-slate-400">Jatuh Tempo Hari Ini • Rp250.000</p></div></div>
+            <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 flex items-start gap-3"><div className="w-2 h-2 rounded-full bg-cyan-400 mt-2" /><div><p className="text-sm f[...]
+            <div className="p-3 rounded-xl bg-slate-800/40 border-slate-700/40 flex items-start gap-3"><div className="w-2 h-2 rounded-full bg-amber-400 mt-2" /><div><p className="text-sm font-se[...]
           </div>
         </div>
       </div>
