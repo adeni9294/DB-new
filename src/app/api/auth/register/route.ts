@@ -1,54 +1,23 @@
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+import { NextResponse } from 'next/server'
+import { executeQuery } from '@/lib/oracle/pool'
+import bcrypt from 'bcrypt'
 
-import { NextResponse } from 'next/server';
-import oracledb from 'oracledb';
-import crypto from 'crypto';
-
-export async function POST(request: Request) {
-  let connection;
+export async function POST(req: Request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, full_name } = await req.json()
+    const password_hash = await bcrypt.hash(password, 10)
 
-    if (!email ||!password) {
-      return NextResponse.json({ success: false, message: 'Email dan password wajib diisi' }, { status: 400 });
-    }
+    await executeQuery(
+      `INSERT INTO users (email, password_hash, full_name) VALUES (:1, :2, :3)`,
+      [email, password_hash, full_name]
+    )
 
-    const connectString = `(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-batam-1.oraclecloud.com))(connect_data=(service_name=gfc40edfb77a0d0_dbhaulnew_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))`
-
-    connection = await oracledb.getConnection({
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      connectString: connectString
-    });
-
-    const result = await connection.execute(
-      `SELECT ID, EMAIL, PASSWORD_HASH, SALT, FULL_NAME FROM ADMIN.APP_USERS WHERE EMAIL = :email`,
-      [email],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
-
-    const user = result.rows?.[0] as any;
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'Email tidak ditemukan' }, { status: 401 });
-    }
-
-    // PENTING: 100000 iterasi sama kayak register
-    const hash = crypto.pbkdf2Sync(password, user.SALT, 100000, 32, 'sha512').toString('hex');
-    if (hash!== user.PASSWORD_HASH) {
-      return NextResponse.json({ success: false, message: 'Password salah' }, { status: 401 });
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      message: "Login berhasil", 
-      user: { id: user.ID, email: user.EMAIL, fullName: user.FULL_NAME } 
-    });
-
+    return NextResponse.json({ success: true, message: 'Registrasi berhasil' })
   } catch (error: any) {
-    console.error("DB ERROR:", error);
-    return NextResponse.json({ success: false, message: `Terjadi kesalahan server: ${error.message}` }, { status: 500 });
-  } finally {
-    if (connection) await connection.close();
+    if (error.errorNum === 1) {
+      return NextResponse.json({ error: 'Email sudah terdaftar' }, { status: 400 })
+    }
+    console.error(error)
+    return NextResponse.json({ error: 'Gagal registrasi' }, { status: 500 })
   }
 }

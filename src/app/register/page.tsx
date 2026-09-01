@@ -1,111 +1,69 @@
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+'use client'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [full_name, setFullName] = useState('')
+  const [error, setError] = useState('')
+  const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, full_name })
+    })
 
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Gagal mendaftar');
-      }
-
-      // Berhasil registrasi, arahkan ke halaman login
-      router.push('/login');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    const data = await res.json()
+    if (res.ok) {
+      alert('Registrasi berhasil! Silakan login')
+      router.push('/login')
+    } else {
+      setError(data.error)
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-slate-800 shadow-2xl">
-        <h2 className="text-2xl font-bold text-slate-100 mb-2 text-center">Buat Akun K&B</h2>
-        <p className="text-sm text-slate-400 mb-6 text-center">Daftar untuk mengakses platform manajemen</p>
-
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Nama Lengkap</label>
-            <input
-              type="text"
-              required
-              value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
-              placeholder="Nama Anda"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
-              placeholder="nama@email.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 text-slate-100 focus:outline-none focus:border-cyan-500 transition"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition duration-200 disabled:opacity-50"
-          >
-            {loading ? 'Memproses...' : 'Daftar Sekarang'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-slate-400">
-          Sudah punya akun?{' '}
-          <Link href="/login" className="text-cyan-400 hover:underline">
-            Masuk di sini
-          </Link>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <form onSubmit={handleRegister} className="bg-white p-8 rounded-lg shadow-md w-96">
+        <h1 className="text-2xl font-bold mb-6 text-center">Daftar</h1>
+        {error && <p className="text-red-500 mb-4">{error}</p>}
+        <input 
+          type="text" 
+          placeholder="Nama Lengkap" 
+          value={full_name}
+          onChange={(e) => setFullName(e.target.value)}
+          className="w-full p-2 border rounded mb-4"
+          required 
+        />
+        <input 
+          type="email" 
+          placeholder="Email" 
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full p-2 border rounded mb-4"
+          required 
+        />
+        <input 
+          type="password" 
+          placeholder="Password" 
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full p-2 border rounded mb-4"
+          required 
+        />
+        <button type="submit" className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">
+          Daftar
+        </button>
+        <p className="text-center mt-4">
+          Sudah punya akun? <a href="/login" className="text-blue-600">Login</a>
         </p>
-      </div>
+      </form>
     </div>
-  );
+  )
 }
