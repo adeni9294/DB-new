@@ -1,4 +1,4 @@
-import { executeQuery, getOraclePool } from '../pool';
+import { executeQuery } from '../pool'; // HAPUS getOraclePool
 
 export interface OrgMemberNode {
   memberId: string;
@@ -18,22 +18,22 @@ export interface OrganizationDetail {
   members: OrgMemberNode[];
 }
 
-// Type buat hasil DB
+// Type buat hasil DB - Oracle return UPPERCASE
 type DbOrgRow = {
-  id: string;
-  name: string;
-  description: string;
-  total_events: number;
-  total_members: number;
+  ID: string;
+  NAME: string;
+  DESCRIPTION: string;
+  TOTAL_EVENTS: number;
+  TOTAL_MEMBERS: number;
 }
 
 type DbMemberRow = {
-  member_id: string;
-  user_id: string;
-  user_name: string;
-  user_email: string;
-  position_title: string;
-  level_order: number;
+  MEMBER_ID: string;
+  USER_ID: string;
+  USER_NAME: string;
+  USER_EMAIL: string;
+  POSITION_TITLE: string;
+  LEVEL_ORDER: number;
 }
 
 export async function getOrganizationStructure(organizationId: string): Promise<OrganizationDetail | null> {
@@ -49,12 +49,12 @@ export async function getOrganizationStructure(organizationId: string): Promise<
     WHERE o.id = :organizationId
   `;
   
-  const orgRows = await executeQuery(orgSql, { organizationId }) as DbOrgRow[]; // HAPUS <any>
+  const orgRows = await executeQuery(orgSql, { organizationId }) as DbOrgRow[];
   if (orgRows.length === 0) return null;
 
   const org = orgRows[0];
 
-  // Query Members & Positions (Urut berdasarkan Level Jabatan)
+  // Query Members & Positions
   const memberSql = `
     SELECT 
       om.id AS member_id,
@@ -70,21 +70,21 @@ export async function getOrganizationStructure(organizationId: string): Promise<
     ORDER BY p.level_order ASC, u.name ASC
   `;
 
-  const memberRows = await executeQuery(memberSql, { organizationId }) as DbMemberRow[]; // HAPUS <any>
+  const memberRows = await executeQuery(memberSql, { organizationId }) as DbMemberRow[];
 
   return {
-    id: org.id, // GANTI JADI lowercase
-    name: org.name,
-    description: org.description,
-    totalEvents: Number(org.total_events),
-    totalMembers: Number(org.total_members),
+    id: org.ID, // Oracle return UPPERCASE
+    name: org.NAME,
+    description: org.DESCRIPTION,
+    totalEvents: Number(org.TOTAL_EVENTS),
+    totalMembers: Number(org.TOTAL_MEMBERS),
     members: memberRows.map((m) => ({
-      memberId: m.member_id, // lowercase
-      userId: m.user_id,
-      userName: m.user_name,
-      userEmail: m.user_email,
-      positionTitle: m.position_title,
-      levelOrder: Number(m.level_order),
+      memberId: m.MEMBER_ID,
+      userId: m.USER_ID,
+      userName: m.USER_NAME,
+      userEmail: m.USER_EMAIL,
+      positionTitle: m.POSITION_TITLE,
+      levelOrder: Number(m.LEVEL_ORDER),
     })),
   };
 }
