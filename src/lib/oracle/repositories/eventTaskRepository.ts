@@ -1,4 +1,4 @@
-import { executeQuery } from '../pool'; // BENER
+import { executeQuery } from '../pool';
 import oracledb from 'oracledb';
 
 export interface EventDTO {
@@ -7,7 +7,7 @@ export interface EventDTO {
   title: string;
   description?: string;
   startDate: string; // YYYY-MM-DD HH24:MI
-  endDate: string;   // YYYY-MM-DD HH24:MI
+  endDate: string; // YYYY-MM-DD HH24:MI
   location?: string;
 }
 
@@ -22,10 +22,6 @@ export interface TaskDTO {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 }
 
-// Type buat hasil DB
-type DbEventRow = { id: string }
-type DbTaskRow = { id: string }
-
 export async function createEvent(dto: EventDTO): Promise<string> {
   const sql = `
     INSERT INTO events (
@@ -39,28 +35,19 @@ export async function createEvent(dto: EventDTO): Promise<string> {
     ) RETURNING id INTO :id
   `;
 
-  const pool = await executeQuery();
-  const conn = await pool.getConnection();
+  const binds = {
+    organizationId: dto.organizationId || null,
+    createdBy: dto.createdBy,
+    title: dto.title,
+    description: dto.description || null,
+    startDate: dto.startDate,
+    endDate: dto.endDate,
+    location: dto.location || null,
+    id: { dir: oracledb.BIND_OUT, type: oracledb.STRING } // <-- KUNCINYA
+  };
 
-  try {
-    const res = await conn.execute(
-      sql,
-      {
-        organizationId: dto.organizationId || null,
-        createdBy: dto.createdBy,
-        title: dto.title,
-        description: dto.description || null,
-        startDate: dto.startDate,
-        endDate: dto.endDate,
-        location: dto.location || null,
-        id: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
-      },
-      { autoCommit: true }
-    );
-    return (res.outBinds as DbEventRow).id;
-  } finally {
-    await conn.close();
-  }
+  const result = await executeQuery(sql, binds);
+  return result.outBinds.id[0]; // ambil ID yg di return
 }
 
 export async function createTask(dto: TaskDTO): Promise<string> {
@@ -76,29 +63,20 @@ export async function createTask(dto: TaskDTO): Promise<string> {
     ) RETURNING id INTO :id
   `;
 
-  const pool = await executeQuery();
-  const conn = await pool.getConnection();
+  const binds = {
+    userId: dto.userId,
+    organizationId: dto.organizationId || null,
+    eventId: dto.eventId || null,
+    assignedTo: dto.assignedTo || null,
+    title: dto.title,
+    description: dto.description || null,
+    dueDate: dto.dueDate || null,
+    priority: dto.priority,
+    id: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+  };
 
-  try {
-    const res = await conn.execute(
-      sql,
-      {
-        userId: dto.userId,
-        organizationId: dto.organizationId || null,
-        eventId: dto.eventId || null,
-        assignedTo: dto.assignedTo || null,
-        title: dto.title,
-        description: dto.description || null,
-        dueDate: dto.dueDate || null,
-        priority: dto.priority,
-        id: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
-      },
-      { autoCommit: true }
-    );
-    return (res.outBinds as DbTaskRow).id;
-  } finally {
-    await conn.close();
-  }
+  const result = await executeQuery(sql, binds);
+  return result.outBinds.id[0];
 }
 
 
