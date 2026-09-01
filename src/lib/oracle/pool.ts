@@ -32,3 +32,5 @@ export async function executeQuery(sql: string, binds: any = {}) {
     if (connection) await connection.close();
   }
 }
+
+

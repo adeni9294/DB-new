@@ -1,4 +1,4 @@
-import { executeQuery, getOraclePool } from '../pool';
+import { executeQuery } from '../pool'; // BENER
 import oracledb from 'oracledb';
 
 export interface EventDTO {
@@ -39,7 +39,7 @@ export async function createEvent(dto: EventDTO): Promise<string> {
     ) RETURNING id INTO :id
   `;
 
-  const pool = await getOraclePool();
+  const pool = await executeQuery();
   const conn = await pool.getConnection();
 
   try {
@@ -76,7 +76,7 @@ export async function createTask(dto: TaskDTO): Promise<string> {
     ) RETURNING id INTO :id
   `;
 
-  const pool = await getOraclePool();
+  const pool = await executeQuery();
   const conn = await pool.getConnection();
 
   try {
