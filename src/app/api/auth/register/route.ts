@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { executeQuery } from '@/lib/oracle/pool'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs' // BENER
 
 export async function POST(req: Request) {
   try {
