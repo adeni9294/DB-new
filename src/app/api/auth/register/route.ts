@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic' // <-- JANGAN DI BUILD
+export const runtime = 'nodejs' // <-- WAJIB PAKE NODE BUKAN EDGE
+
 import { NextResponse } from 'next/server'
 import { executeQuery } from '@/lib/oracle/pool'
 import bcrypt from 'bcryptjs' // BENER
