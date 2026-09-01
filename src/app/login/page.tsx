@@ -16,7 +16,7 @@ export default function LoginPage() {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
-        credentials: 'include', // <-- KUNCI 1: Biar cookie bisa disimpen
+        credentials: 'include', // biar cookie bisa disimpen
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       })
@@ -24,7 +24,10 @@ export default function LoginPage() {
       const data = await res.json()
       
       if (res.ok) {
-        window.location.href = '/dashboard' // <-- KUNCI 2: Force reload biar middleware ke-trigger
+        // reset loading dulu supaya UI tidak tersangkut bila redirect gagal
+        setLoading(false)
+        // force full reload supaya middleware di server mengecek cookie baru
+        window.location.href = '/dashboard'
       } else {
         setError(data.error || 'Login gagal')
         setLoading(false)

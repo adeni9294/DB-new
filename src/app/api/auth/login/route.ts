@@ -21,10 +21,11 @@ export async function POST(req: Request) {
   }
   if (!isValid) return NextResponse.json({ error: 'Password salah' }, { status: 401 })
 
-  const cookieStore = await cookies() // <-- PAKAI INI BUKAN res.cookies.set
+  const cookieStore = await cookies()
   cookieStore.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL, name: user.FULL_NAME || email }), {
-    httpOnly: true, // <-- INI HARUS TRUE
-    secure: true,
+    httpOnly: true,
+    // hanya aktifkan secure saat production (biar cookie bisa ter-set di http dev)
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 7
