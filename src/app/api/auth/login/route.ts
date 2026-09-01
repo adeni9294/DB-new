@@ -3,17 +3,13 @@ export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { cookies } from 'next/headers' // <-- PAKE INI
 import { executeQuery } from '@/lib/oracle/pool'
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json()
   
-    if (!email ||!password) {
-      return NextResponse.json({ error: 'Email dan password wajib diisi' }, { status: 400 })
-    }
-
-    // Ambil user dari oracle
     const users = await executeQuery(
       `SELECT ID, EMAIL, FULL_NAME, PASSWORD_HASH FROM USERS WHERE EMAIL = :1`,
       [email]
@@ -25,17 +21,17 @@ export async function POST(req: Request) {
     const isValid = await bcrypt.compare(password, user.PASSWORD_HASH)
     if (!isValid) return NextResponse.json({ error: 'Password salah' }, { status: 401 })
 
-    const res = NextResponse.json({ success: true, user: { id: user.ID, name: user.FULL_NAME } })
-    
-    // PENTING: secure HARUS true di Vercel
-    res.cookies.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL, name: user.FULL_NAME }), {
+    // SET COOKIE PAKE CARA BARU
+    const cookieStore = await cookies()
+    cookieStore.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL, name: user.FULL_NAME }), {
       httpOnly: true,
-      secure: true, // <--- UDAH FIX. JANGAN DIUBAH LAGI
+      secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7 // 7 hari
+      maxAge: 60 * 60 * 24 * 7
     })
-    return res
+
+    return NextResponse.json({ success: true, user: { id: user.ID, name: user.FULL_NAME } })
 
   } catch (error: any) {
     console.error('LOGIN ERROR:', error)

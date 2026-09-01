@@ -76,7 +76,7 @@ useEffect(() => {
           <button onClick={() => setActiveModal('pemasukan')} className="flex items-center gap-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-3 py-2 rounded-xl text-sm font-medium transition-all backdrop-blur-md cursor-pointer">
             <PlusCircle className="w-4 h-4" /> Pemasukan
           </button>
-          <button onClick={() => setActiveModal('pengeluaran')} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30 px-3 py-2 rounded-xl text-sm font-medium transition-all backdrop-blur-md cursor-pointer">
+          <button onClick={() => setActiveModal('pengeluaran')} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl text-sm font-medium transition-all backdrop-blur-md cursor-pointer">
             <PlusCircle className="w-4 h-4" /> Pengeluaran
           </button>
           <button onClick={() => setActiveModal('acara')} className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer">
