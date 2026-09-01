@@ -3,39 +3,27 @@ export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { cookies } from 'next/headers'
+import { cookies } from 'next/headers' // <-- INI KUNCI
 import { executeQuery } from '@/lib/oracle/pool'
 
 export async function POST(req: Request) {
   const { email, password } = await req.json()
   
-  const users = await executeQuery(
-    `SELECT ID, EMAIL, FULL_NAME, PASSWORD_HASH FROM USERS WHERE EMAIL = :1`,
-    [email]
-  )
+  const users = await executeQuery(`SELECT * FROM USERS WHERE EMAIL = :1`, [email])
   const user = users[0]
   if (!user) return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 401 })
 
   let isValid = await bcrypt.compare(password, user.PASSWORD_HASH)
-
-  // MIGRASI: Kalau gagal, cek apa ini password plaintext
-  if (!isValid && password === user.PASSWORD_HASH) {
-    console.log("Migrasi user:", email)
-    isValid = true // anggap valid karena sama
-    
-    // Langsung hash dan update ke DB biar next login pake bcrypt
+  if (!isValid && password === user.PASSWORD_HASH) { // migrasi user lama
+    isValid = true 
     const newHash = await bcrypt.hash(password, 10)
-    await executeQuery(
-      `UPDATE USERS SET PASSWORD_HASH = :1 WHERE ID = :2`,
-      [newHash, user.ID]
-    )
+    await executeQuery(`UPDATE USERS SET PASSWORD_HASH = :1 WHERE ID = :2`, [newHash, user.ID])
   }
-
   if (!isValid) return NextResponse.json({ error: 'Password salah' }, { status: 401 })
 
-  const cookieStore = await cookies()
+  const cookieStore = await cookies() // <-- PAKAI INI BUKAN res.cookies.set
   cookieStore.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL, name: user.FULL_NAME || email }), {
-    httpOnly: true,
+    httpOnly: true, // <-- INI HARUS TRUE
     secure: true,
     sameSite: 'lax',
     path: '/',
