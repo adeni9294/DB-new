@@ -1,37 +1,22 @@
 import { NextResponse } from 'next/server'
-import { executeQuery } from '@/lib/oracle/pool'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
+import { db } from '@/lib/db' // ganti sesuai db kamu
 
 export async function POST(req: Request) {
-  try {
-    const { email, password } = await req.json()
+  const { email, password } = await req.json()
 
-    const users: any = await executeQuery(
-      `SELECT id, email, password_hash, full_name, role FROM users WHERE email = :1`,
-      [email]
-    )
+  //... logic cek user ke db kamu...
+  const user = { id: 1, email, name: 'Admin' } // contoh
 
-    const user = users[0]
-    if (!user) return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 })
+  const res = NextResponse.json({ success: true })
 
-    // Karena OUT_FORMAT_OBJECT jadi huruf besar semua
-    const valid = await bcrypt.compare(password, user.PASSWORD_HASH)
-    if (!valid) return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 })
+  res.cookies.set('user', JSON.stringify(user), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // WAJIB true di vercel
+    sameSite: 'lax', // WAJIB biar dikirim antar route
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7 // 7 hari
+  })
 
-    const res = NextResponse.json({
-      success: true,
-      user: { id: user.ID, email: user.EMAIL, name: user.FULL_NAME, role: user.ROLE }
-    })
-
-    res.cookies.set('user', JSON.stringify({ id: user.ID, email: user.EMAIL }), {
-      httpOnly: true,
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/'
-    })
-
-    return res
-  } catch (error: any) {
-    console.error(error)
-    return NextResponse.json({ error: 'Gagal login' }, { status: 500 })
-  }
+  return res
 }

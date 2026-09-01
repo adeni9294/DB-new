@@ -16,20 +16,24 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // GUARD: CEK LOGIN LEWAT API /me
-  useEffect(() => {
-    fetch('/api/auth/me')
-     .then(res => {
-        if (!res.ok) throw new Error('Not logged in')
-        return res.json()
+useEffect(() => {
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/auth/me', { 
+        method: 'GET',
+        credentials: 'include' // <-- INI KUNCINYA
       })
-     .then(data => {
-        setUser(data.user);
-        setLoading(false)
-      })
-     .catch(() => {
-        router.push('/login');
-      })
-  }, [router]);
+      if (!res.ok) throw new Error('Not logged in')
+      const data = await res.json()
+      setUser(data.user);
+    } catch {
+      router.push('/login');
+    } finally {
+      setLoading(false)
+    }
+  }
+  checkAuth()
+}, [router]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
