@@ -59,18 +59,19 @@ export default function DashboardShell({ user, children }: { user: User; childre
           <nav className="space-y-1.5">
             {menuItems.map((item) => {
               const Icon = item.icon as any
-              const isActive = pathname === item.href
+              // aktif kalau path sama atau subpath dari href
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     isActive
-                    ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-sm'
+                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
                   {item.name}
                 </Link>
               )
