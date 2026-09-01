@@ -1,7 +1,7 @@
 import oracledb from 'oracledb';
 
-// PENTING: Harus di paling atas, sebelum createPool
-oracledb.initOracleClient({ libDir: '' }); // Mode Thin
+// HAPUS initOracleClient. Kita paksa mode Thin
+oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 
 let pool: any = null;
 
@@ -18,7 +18,6 @@ export async function getPool() {
   return pool;
 }
 
-// DIUBAH: Sekarang return full result biar bisa akses outBinds
 export async function executeQuery(sql: string, binds: any = {}) {
   const dbPool = await getPool();
   let connection;
@@ -26,10 +25,7 @@ export async function executeQuery(sql: string, binds: any = {}) {
     connection = await dbPool.getConnection();
     const result = await connection.execute(sql, binds, {
       autoCommit: true,
-      outFormat: oracledb.OUT_FORMAT_OBJECT
     });
-    
-    // Kalau ada outBinds, return semua. Kalau SELECT, return rows
     return result.outBinds ? result : (result.rows || []);
   } finally {
     if (connection) await connection.close();
