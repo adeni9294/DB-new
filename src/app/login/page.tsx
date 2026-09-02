@@ -12,28 +12,42 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000) // 15s timeout
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'include', // biar cookie bisa disimpen
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       })
 
-      const data = await res.json()
-      
+      // try parse json safely
+      let data: any = null
+      try {
+        data = await res.json()
+      } catch (err) {
+        console.error('Failed to parse JSON from /api/auth/login', err)
+      }
+
       if (res.ok) {
-        // reset loading dulu supaya UI tidak tersangkut bila redirect gagal
-        setLoading(false)
         // force full reload supaya middleware di server mengecek cookie baru
         window.location.href = '/dashboard'
       } else {
-        setError(data.error || 'Login gagal')
-        setLoading(false)
+        setError((data && data.error) || 'Login gagal')
       }
-    } catch (err) {
-      setError('Gagal konek ke server')
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setError('Permintaan ke server timeout. Silakan coba lagi.')
+      } else {
+        console.error('Login request error:', err)
+        setError('Gagal konek ke server')
+      }
+    } finally {
+      clearTimeout(timeout)
       setLoading(false)
     }
   }
@@ -73,7 +87,7 @@ export default function LoginPage() {
               placeholder="••••" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800" // fix: tambah border
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
               required 
             />
           </div>

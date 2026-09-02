@@ -5,6 +5,16 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { executeQuery } from '@/lib/oracle/pool'
 
+async function withTimeout<T>(p: Promise<T>, ms: number) {
+  let timer: NodeJS.Timeout
+  return await Promise.race([
+    p,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('timeout')), ms)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json()
@@ -14,7 +24,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email dan password wajib diisi' }, { status: 400 })
     }
 
-    const users = await executeQuery(`SELECT * FROM USERS WHERE EMAIL = :1`, [email])
+    // execute query with timeout to avoid server hanging if DB is down
+    let users: any[] = []
+    try {
+      users = await withTimeout(executeQuery(`SELECT * FROM USERS WHERE EMAIL = :1`, [email]), 8000)
+    } catch (e: any) {
+      console.error('DB query failed or timed out', e)
+      return NextResponse.json({ error: 'Gagal terhubung ke database' }, { status: 504 })
+    }
+
     const user = users && users[0]
     if (!user) return NextResponse.json({ error: 'User tidak ditemukan' }, { status: 401 })
 
@@ -22,6 +40,7 @@ export async function POST(req: Request) {
     try {
       isValid = await bcrypt.compare(password, user.PASSWORD_HASH)
     } catch (e) {
+      // bcrypt.compare mungkin error bila hash tidak valid — tangani sebagai false
       console.error('bcrypt.compare error', e)
       isValid = false
     }
@@ -54,6 +73,7 @@ export async function POST(req: Request) {
 
     return res
   } catch (err) {
+    // Tangani error server (DB down / koneksi / runtime errors)
     console.error('Login handler error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
