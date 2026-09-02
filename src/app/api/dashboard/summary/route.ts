@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getExecutionConnection } from '@/lib/oracle/pool'
+import { getConnection } from '@/lib/oracle/pool'
 
 export async function GET() {
   let connection;
