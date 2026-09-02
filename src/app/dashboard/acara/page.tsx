@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Calendar, PlusCircle, Clock, MapPin, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Calendar, PlusCircle, Clock, MapPin } from 'lucide-react'
 
 type EventItem = {
   id: number
@@ -15,57 +15,49 @@ type EventItem = {
 
 export default function AcaraPage() {
   const searchParams = useSearchParams()
-  const defaultAction = searchParams.get('action') // Menangkap parameter ?action=baru dari Dashboard
+  const defaultAction = searchParams.get('action')
 
-  // State Daftar Acara
-  const [events, setEvents] = useState<EventItem[]>([
-    {
-      id: 1,
-      title: 'Rapat Koordinasi Panitia',
-      date: '2026-09-10',
-      time: '10:00 - 11:30 WIB',
-      location: 'Ruang Rapat Utama / Zoom',
-      status: 'Mendatang',
-    },
-    {
-      id: 2,
-      title: 'Penutupan Donasi Kas Organisasi',
-      date: '2026-09-17',
-      time: '23:59 WIB',
-      location: 'Online Platform',
-      status: 'Mendatang',
-    },
-    {
-      id: 3,
-      title: 'Acara Seminar Kit & Workshop',
-      date: '2026-08-25',
-      time: '09:00 - 15:00 WIB',
-      location: 'Auditorium Gedung B',
-      status: 'Selesai',
-    },
-  ])
+  const [events, setEvents] = useState<EventItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // State Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [location, setLocation] = useState('')
 
-  // Buka modal otomatis jika diakses via tombol Quick Action Dashboard
+  // 1. Fetch Data Acara dari Oracle API
+  const fetchEvents = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/events')
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setEvents(data)
+      }
+    } catch (err) {
+      console.error('Gagal mengambil data acara:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchEvents()
+  }, [])
+
   useEffect(() => {
     if (defaultAction === 'baru') {
       setIsModalOpen(true)
     }
   }, [defaultAction])
 
-  // Tambah Acara Baru
-  const handleSubmit = (e: React.FormEvent) => {
+  // 2. Submit Data Acara Baru ke Oracle API
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title || !date) return
 
-    const newEvent: EventItem = {
-      id: Date.now(),
+    const payload = {
       title,
       date,
       time: time || 'Seharian',
@@ -73,17 +65,28 @@ export default function AcaraPage() {
       status: 'Mendatang',
     }
 
-    setEvents([newEvent, ...events])
-    setIsModalOpen(false)
-    setTitle('')
-    setDate('')
-    setTime('')
-    setLocation('')
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (res.ok) {
+        setIsModalOpen(false)
+        setTitle('')
+        setDate('')
+        setTime('')
+        setLocation('')
+        fetchEvents() // Reload data dari database Oracle
+      }
+    } catch (err) {
+      console.error('Gagal menyimpan acara:', err)
+    }
   }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto text-slate-100">
-      {/* HEADER PAGE */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Acara & Kegiatan</h1>
@@ -100,49 +103,53 @@ export default function AcaraPage() {
         </button>
       </div>
 
-      {/* DAFTAR ACARA GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {events.map((item) => (
-          <div
-            key={item.id}
-            className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-4 flex flex-col justify-between"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                    item.status === 'Mendatang'
-                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-                      : item.status === 'Berjalan'
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}
-                >
-                  {item.status}
-                </span>
-                <Calendar className="w-4 h-4 text-slate-500" />
-              </div>
-
-              <h3 className="text-base font-bold text-white pt-1">{item.title}</h3>
-
-              <div className="space-y-1.5 pt-2 text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>
-                    {item.date} • {item.time}
+      {loading ? (
+        <p className="text-xs text-slate-400">Memuat acara dari Oracle DB...</p>
+      ) : events.length === 0 ? (
+        <p className="text-xs text-slate-500 text-center py-10">Belum ada acara yang tersimpan di database Oracle.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {events.map((item) => (
+            <div
+              key={item.id}
+              className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-4 flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
+                      item.status === 'Mendatang'
+                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                        : item.status === 'Berjalan'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}
+                  >
+                    {item.status}
                   </span>
+                  <Calendar className="w-4 h-4 text-slate-500" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span className="truncate">{item.location}</span>
+
+                <h3 className="text-base font-bold text-white pt-1">{item.title}</h3>
+
+                <div className="space-y-1.5 pt-2 text-xs text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>
+                      {item.date} • {item.time}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span className="truncate">{item.location}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* MODAL TAMBAH ACARA */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
