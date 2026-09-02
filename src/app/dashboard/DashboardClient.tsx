@@ -1,48 +1,86 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  PlusCircle,
-  CalendarPlus,
-  LogOut,
   Wallet,
   TrendingUp,
   TrendingDown,
   PieChart,
-  CheckCircle2,
+  PlusCircle,
+  Calendar,
+  LogOut,
   Clock
 } from 'lucide-react'
 
-type UserType = {
-  id?: number
-  email?: string
-  fullName?: string
-  role?: string
+type DashboardData = {
+  userEmail: string
+  totalSaldo: number
+  pemasukanBulanIni: number
+  pengeluaranBulanIni: number
+  sisaBudget: number
+  pemasukanNote?: string
+  pengeluaranNote?: string
+  saldoPercentageChange?: string
+  budgets: Array<{
+    id: number
+    category: string
+    percentage: number
+  }>
+  agendaToday: Array<{
+    id: number
+    title: string
+    time: string
+  }>
 }
 
-export default function DashboardClient({ user }: { user?: UserType }) {
+export default function DashboardPage() {
   const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<DashboardData>({
+    userEmail: 'adeni9294@gmail.com',
+    totalSaldo: 0,
+    pemasukanBulanIni: 0,
+    pengeluaranBulanIni: 0,
+    sisaBudget: 0,
+    budgets: [],
+    agendaToday: []
+  })
 
-  const handleLogout = async () => {
+  // 1. Fetch Data Ringkasan dari Oracle DB via API
+  const fetchDashboardData = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-    } catch (e) {
-      // ignore error
+      setLoading(true)
+      const res = await fetch('/api/dashboard/summary')
+      if (res.ok) {
+        const result = await res.json()
+        setData(result)
+      }
+    } catch (err) {
+      console.error('Gagal mengambil data dashboard:', err)
+    } finally {
+      setLoading(false)
     }
-    try {
-      localStorage.removeItem('user')
-    } catch (e) {}
-    router.push('/login')
+  }
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  // Fungsi Logout
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    router.push('/')
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* HEADER BAR & ACTION BUTTONS */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto text-slate-100">
+      {/* HEADER DASHBOARD */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
-            Halo, {user?.email || 'adeni9294@gmail.com'} <span className="animate-bounce">👋</span>
+          <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2">
+            Halo, <span className="text-white">{data.userEmail}</span> 👋
           </h1>
           <p className="text-sm text-slate-400 mt-1">
             Pantau arus kas, budget, organisasi, dan acara dalam satu tampilan.
@@ -51,95 +89,108 @@ export default function DashboardClient({ user }: { user?: UserType }) {
 
         {/* QUICK ACTION BUTTONS */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={() => router.push('/dashboard/keuangan?action=pemasukan')}
-            className="flex items-center gap-2 px-3.5 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95"
+          <Link
+            href="/dashboard/keuangan?action=pemasukan"
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/60 rounded-xl text-xs font-semibold transition-all"
           >
             <PlusCircle className="w-4 h-4" /> Pemasukan
-          </button>
+          </Link>
 
-          <button
-            onClick={() => router.push('/dashboard/keuangan?action=pengeluaran')}
-            className="flex items-center gap-2 px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95"
+          <Link
+            href="/dashboard/keuangan?action=pengeluaran"
+            className="flex items-center gap-2 px-4 py-2 bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 rounded-xl text-xs font-semibold transition-all"
           >
             <PlusCircle className="w-4 h-4" /> Pengeluaran
-          </button>
+          </Link>
 
-          <button
-            onClick={() => router.push('/dashboard/acara?action=baru')}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95"
+          <Link
+            href="/dashboard/acara?action=baru"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold transition-all"
           >
-            <CalendarPlus className="w-4 h-4" /> Acara Baru
-          </button>
+            <Calendar className="w-4 h-4" /> Acara Baru
+          </Link>
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 border border-slate-700/80 hover:border-rose-500/30 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 rounded-xl text-xs font-semibold transition-all"
           >
             <LogOut className="w-4 h-4" /> Keluar
           </button>
         </div>
       </div>
 
-      {/* METRIC CARDS GRID */}
+      {/* STATS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Saldo */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">Total Saldo</span>
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                <Wallet className="w-4 h-4" />
-              </div>
+        {/* CARD 1: TOTAL SALDO */}
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Total Saldo</span>
+            <div className="p-2 bg-cyan-500/10 rounded-xl text-cyan-400 border border-cyan-500/20">
+              <Wallet className="w-4 h-4" />
             </div>
-            <h3 className="text-2xl font-bold text-white mt-3">Rp 42.850.000</h3>
           </div>
-          <p className="text-[11px] text-emerald-400 flex items-center gap-1 mt-4">
-            <TrendingUp className="w-3 h-3" /> +4.2% dari bulan lalu
-          </p>
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {loading ? '...' : `Rp ${data.totalSaldo.toLocaleString('id-ID')}`}
+            </h2>
+            <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1 font-medium">
+              <TrendingUp className="w-3 h-3" />
+              {data.saldoPercentageChange || '+0% dari bulan lalu'}
+            </p>
+          </div>
         </div>
 
-        {/* Pemasukan Bulan Ini */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">Pemasukan Bulan Ini</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <TrendingUp className="w-4 h-4" />
-              </div>
+        {/* CARD 2: PEMASUKAN BULAN INI */}
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Pemasukan Bulan Ini</span>
+            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
+              <TrendingUp className="w-4 h-4" />
             </div>
-            <h3 className="text-2xl font-bold text-white mt-3">Rp 12.500.000</h3>
           </div>
-          <p className="text-[11px] text-slate-400 mt-4">Gaji + Sponsorship Acara</p>
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {loading ? '...' : `Rp ${data.pemasukanBulanIni.toLocaleString('id-ID')}`}
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-1.5 truncate">
+              {data.pemasukanNote || 'Arus kas masuk'}
+            </p>
+          </div>
         </div>
 
-        {/* Pengeluaran Bulan Ini */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">Pengeluaran Bulan Ini</span>
-              <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-                <TrendingDown className="w-4 h-4" />
-              </div>
+        {/* CARD 3: PENGELUARAN BULAN INI */}
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Pengeluaran Bulan Ini</span>
+            <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20">
+              <TrendingDown className="w-4 h-4" />
             </div>
-            <h3 className="text-2xl font-bold text-white mt-3">Rp 6.820.000</h3>
           </div>
-          <p className="text-[11px] text-slate-400 mt-4">Personal & Operasional</p>
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {loading ? '...' : `Rp ${data.pengeluaranBulanIni.toLocaleString('id-ID')}`}
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-1.5 truncate">
+              {data.pengeluaranNote || 'Operasional & Kegiatan'}
+            </p>
+          </div>
         </div>
 
-        {/* Sisa Budget Aktif */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">Sisa Budget Aktif</span>
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                <PieChart className="w-4 h-4" />
-              </div>
+        {/* CARD 4: SISA BUDGET AKTIF */}
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Sisa Budget Aktif</span>
+            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
+              <PieChart className="w-4 h-4" />
             </div>
-            <h3 className="text-2xl font-bold text-white mt-3">Rp 3.180.000</h3>
           </div>
-          <div className="w-full bg-slate-800 rounded-full h-1.5 mt-4 overflow-hidden">
-            <div className="bg-cyan-400 h-1.5 rounded-full" style={{ width: '65%' }}></div>
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {loading ? '...' : `Rp ${data.sisaBudget.toLocaleString('id-ID')}`}
+            </h2>
+            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div className="bg-cyan-400 h-full w-[65%]" />
+            </div>
           </div>
         </div>
       </div>
@@ -153,81 +204,71 @@ export default function DashboardClient({ user }: { user?: UserType }) {
             <h2 className="text-base font-bold text-white">Batas & Progress Budget</h2>
           </div>
 
-          <div className="space-y-4">
-            {/* Item 1 */}
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 font-medium mb-1.5">
-                <span>Makanan & Minuman</span>
-                <span>70%</span>
-              </div>
-              <div className="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
-                <div className="bg-emerald-400 h-2 rounded-full" style={{ width: '70%' }}></div>
-              </div>
+          {loading ? (
+            <p className="text-xs text-slate-400">Memuat budget dari database...</p>
+          ) : data.budgets.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4">Belum ada data budget di Oracle DB.</p>
+          ) : (
+            <div className="space-y-4">
+              {data.budgets.map((b) => (
+                <div key={b.id} className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-300 font-medium">{b.category}</span>
+                    <span
+                      className={`font-bold ${
+                        b.percentage > 100 ? 'text-rose-400' : b.percentage > 80 ? 'text-amber-400' : 'text-slate-400'
+                      }`}
+                    >
+                      {b.percentage}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/60">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        b.percentage > 100
+                          ? 'bg-rose-500'
+                          : b.percentage > 80
+                          ? 'bg-amber-400'
+                          : 'bg-emerald-400'
+                      }`}
+                      style={{ width: `${Math.min(b.percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-
-            {/* Item 2 */}
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 font-medium mb-1.5">
-                <span>Transportasi</span>
-                <span>45%</span>
-              </div>
-              <div className="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
-                <div className="bg-emerald-400 h-2 rounded-full" style={{ width: '45%' }}></div>
-              </div>
-            </div>
-
-            {/* Item 3 */}
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 font-medium mb-1.5">
-                <span>Kas Organisasi K&B</span>
-                <span>82%</span>
-              </div>
-              <div className="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
-                <div className="bg-amber-400 h-2 rounded-full" style={{ width: '82%' }}></div>
-              </div>
-            </div>
-
-            {/* Item 4 */}
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 font-medium mb-1.5">
-                <span>Acara Seminar Kit</span>
-                <span className="text-rose-400 font-semibold">104%</span>
-              </div>
-              <div className="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden">
-                <div className="bg-rose-500 h-2 rounded-full" style={{ width: '100%' }}></div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* AGENDA & TASK HARI INI */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md space-y-4">
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md space-y-5">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+            <Calendar className="w-4 h-4 text-cyan-400" />
             <h2 className="text-base font-bold text-white">Agenda & Task Hari Ini</h2>
           </div>
 
-          <div className="space-y-3">
-            {/* Task 1 */}
-            <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3.5 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0"></span>
-                <h4 className="text-xs font-semibold text-slate-200">Rapat Koordinasi</h4>
-              </div>
-              <p className="text-[11px] text-slate-400 pl-4 flex items-center gap-1">
-                <Clock className="w-3 h-3" /> 10:00 - 11:30
-              </p>
+          {loading ? (
+            <p className="text-xs text-slate-400">Memuat agenda...</p>
+          ) : data.agendaToday.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4">Tidak ada agenda untuk hari ini.</p>
+          ) : (
+            <div className="space-y-3">
+              {data.agendaToday.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3.5 bg-slate-950/50 border border-slate-800/80 rounded-xl space-y-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                    <h3 className="text-xs font-semibold text-white">{item.title}</h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 pl-4 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {item.time}
+                  </p>
+                </div>
+              ))}
             </div>
-
-            {/* Task 2 */}
-            <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3.5 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
-                <h4 className="text-xs font-semibold text-slate-200">Penutupan Donasi</h4>
-              </div>
-              <p className="text-[11px] text-slate-400 pl-4">Sampai 17 Sep 2026</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
