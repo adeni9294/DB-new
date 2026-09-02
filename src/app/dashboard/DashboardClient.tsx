@@ -11,7 +11,8 @@ import {
   PlusCircle,
   Calendar,
   LogOut,
-  Clock
+  Clock,
+  Lock
 } from 'lucide-react'
 
 type DashboardData = {
@@ -46,8 +47,12 @@ interface DashboardClientProps {
 export default function DashboardClient({ user }: DashboardClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+
+  // Cek apakah pengurus terautentikasi
+  const isPengurus = Boolean(user && user.email)
+
   const [data, setData] = useState<DashboardData>({
-    userEmail: user?.email || 'adeni9294@gmail.com',
+    userEmail: user?.email || 'Laporan Transparansi',
     totalSaldo: 0,
     pemasukanBulanIni: 0,
     pengeluaranBulanIni: 0,
@@ -64,7 +69,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
         const result = await res.json()
 
         setData({
-          userEmail: result.userEmail || user?.email || 'adeni9294@gmail.com',
+          userEmail: user?.email || result.userEmail || 'Laporan Transparansi',
           totalSaldo: result.totalSaldo || 0,
           pemasukanBulanIni: result.pemasukanBulanIni || 0,
           pengeluaranBulanIni: result.pengeluaranBulanIni || 0,
@@ -87,53 +92,85 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     fetchDashboardData()
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    router.push('/')
+  const handleLogout = async () => {
+    try {
+      // Hapus cookie user dari server side
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (err) {
+      console.error('Gagal logout:', err)
+    } finally {
+      localStorage.removeItem('user')
+      router.push('/')
+      router.refresh()
+    }
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-slate-100">
+    <div className="space-y-6 max-w-7xl mx-auto text-slate-100 p-4">
       {/* HEADER DASHBOARD */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2">
-            Halo, <span className="text-white">{data.userEmail}</span> 👋
+            {isPengurus ? (
+              <>Halo, <span className="text-white">{user?.name || data.userEmail}</span> 👋</>
+            ) : (
+              <span className="text-white">Laporan Keuangan & Kegiatan</span>
+            )}
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Pantau arus kas, budget, organisasi, dan acara dalam satu tampilan.
+            {isPengurus
+              ? 'Pantau arus kas, budget, organisasi, dan acara dalam satu tampilan.'
+              : 'Informasi keuangan dan agenda organisasi terbuka secara transparan.'}
           </p>
         </div>
 
         {/* QUICK ACTION BUTTONS */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <Link
-            href="/dashboard/keuangan?action=pemasukan"
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/60 rounded-xl text-xs font-semibold transition-all"
-          >
-            <PlusCircle className="w-4 h-4" /> Pemasukan
-          </Link>
+          {isPengurus ? (
+            /* TOMBOL UNTUK PENGURUS (LOGGED IN) */
+            <>
+              <Link
+                href="/dashboard/keuangan?action=pemasukan"
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/60 rounded-xl text-xs font-semibold transition-all"
+              >
+                <PlusCircle className="w-4 h-4" /> Pemasukan
+              </Link>
 
-          <Link
-            href="/dashboard/keuangan?action=pengeluaran"
-            className="flex items-center gap-2 px-4 py-2 bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 rounded-xl text-xs font-semibold transition-all"
-          >
-            <PlusCircle className="w-4 h-4" /> Pengeluaran
-          </Link>
+              <Link
+                href="/dashboard/keuangan?action=pengeluaran"
+                className="flex items-center gap-2 px-4 py-2 bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 rounded-xl text-xs font-semibold transition-all"
+              >
+                <PlusCircle className="w-4 h-4" /> Pengeluaran
+              </Link>
 
-          <Link
-            href="/dashboard/acara?action=baru"
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold transition-all"
-          >
-            <Calendar className="w-4 h-4" /> Acara Baru
-          </Link>
+              <Link
+                href="/dashboard/acara?action=baru"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold transition-all"
+              >
+                <Calendar className="w-4 h-4" /> Acara Baru
+              </Link>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 rounded-xl text-xs font-semibold transition-all"
-          >
-            <LogOut className="w-4 h-4" /> Keluar
-          </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 rounded-xl text-xs font-semibold transition-all"
+              >
+                <LogOut className="w-4 h-4" /> Keluar
+              </button>
+            </>
+          ) : (
+            /* TOMBOL UNTUK PUBLIK (GUEST / READ-ONLY) */
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-slate-800/80 text-slate-400 px-3 py-2 rounded-xl border border-slate-700">
+                Mode Publik (Read-Only)
+              </span>
+              <Link
+                href="/login"
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-cyan-950/50"
+              >
+                <Lock className="w-4 h-4" /> Login Pengurus
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
