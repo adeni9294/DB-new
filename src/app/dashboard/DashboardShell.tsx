@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Wallet,
@@ -27,7 +27,6 @@ export default function DashboardShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const router = useRouter()
 
   const handleLogout = async () => {
     try {
@@ -39,7 +38,9 @@ export default function DashboardShell({
       localStorage.removeItem('user')
     } catch (e) {}
     
-    router.push('/login')
+    // PERBAIKAN: Arahkan ke halaman utama publik (/), bukan ke /login
+    // Menggunakan window.location.href untuk mencerabut cookie & session cache Next.js
+    window.location.href = '/'
   }
 
   const menuItems = [
@@ -73,7 +74,6 @@ export default function DashboardShell({
             {menuItems.map((item) => {
               const Icon = item.icon
               
-              // Perbaikan logika isActive agar /dashboard tidak selalu true di sub-menu lain
               const isActive = item.href === '/dashboard'
                 ? pathname === '/dashboard'
                 : pathname === item.href || pathname.startsWith(item.href + '/')
