@@ -35,11 +35,19 @@ type DashboardData = {
   }>
 }
 
-export default function DashboardPage() {
+interface DashboardClientProps {
+  user?: {
+    id?: any
+    email?: any
+    name?: any
+  }
+}
+
+export default function DashboardClient({ user }: DashboardClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData>({
-    userEmail: 'adeni9294@gmail.com',
+    userEmail: user?.email || 'adeni9294@gmail.com',
     totalSaldo: 0,
     pemasukanBulanIni: 0,
     pengeluaranBulanIni: 0,
@@ -48,17 +56,54 @@ export default function DashboardPage() {
     agendaToday: []
   })
 
-  // 1. Fetch Data Ringkasan dari Oracle DB via API
+  // Fetch & Kalkulasi data langsung dari /api/transactions
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/dashboard/summary')
+      const res = await fetch('/api/transactions')
       if (res.ok) {
         const result = await res.json()
-        setData(result)
+        const rawList = Array.isArray(result) ? result : result.data || []
+
+        let totalPemasukan = 0
+        let totalPengeluaran = 0
+
+        rawList.forEach((item: any) => {
+          const type = (item.TYPE || item.type || '').toLowerCase()
+          const amount = Number(item.AMOUNT || item.amount || 0)
+
+          if (type === 'pemasukan' || type === 'income') {
+            totalPemasukan += amount
+          } else if (type === 'pengeluaran' || type === 'expense') {
+            totalPengeluaran += amount
+          }
+        })
+
+        const totalSaldo = totalPemasukan - totalPengeluaran
+
+        setData({
+          userEmail: user?.email || 'adeni9294@gmail.com',
+          totalSaldo,
+          pemasukanBulanIni: totalPemasukan,
+          pengeluaranBulanIni: totalPengeluaran,
+          sisaBudget: 3180000,
+          pemasukanNote: 'Total Kas Masuk (Oracle DB)',
+          pengeluaranNote: 'Total Kas Keluar (Oracle DB)',
+          saldoPercentageChange: '+0% dari bulan lalu',
+          budgets: [
+            { id: 1, category: 'Makanan & Minuman', percentage: 70 },
+            { id: 2, category: 'Transportasi', percentage: 45 },
+            { id: 3, category: 'Kas Organisasi K&B', percentage: 82 },
+            { id: 4, category: 'Acara Seminar Kit', percentage: 104 }
+          ],
+          agendaToday: [
+            { id: 1, title: 'Rapat Koordinasi', time: '10:00 - 11:30' },
+            { id: 2, title: 'Penutupan Donasi', time: 'Sampai 17 Sep 2026' }
+          ]
+        })
       }
     } catch (err) {
-      console.error('Gagal mengambil data dashboard:', err)
+      console.error('Gagal mengambil data dari Oracle DB:', err)
     } finally {
       setLoading(false)
     }
@@ -68,7 +113,6 @@ export default function DashboardPage() {
     fetchDashboardData()
   }, [])
 
-  // Fungsi Logout
   const handleLogout = () => {
     localStorage.removeItem('user')
     router.push('/')
