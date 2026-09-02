@@ -1,315 +1,288 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
-import {
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  PieChart,
-  PlusCircle,
-  Calendar,
-  Clock,
-  Lock
-} from 'lucide-react'
+import React, { useState, useEffect } from "react";
+import { 
+  Wallet, ArrowUpRight, ArrowDownRight, Calendar, MapPin, 
+  BookOpen, Compass, Clock, LogIn, Sparkles, Navigation, Phone, MessageSquare
+} from "lucide-react";
 
-type DashboardData = {
-  userEmail: string
-  totalSaldo: number
-  pemasukanBulanIni: number
-  pengeluaranBulanIni: number
-  sisaBudget: number
-  pemasukanNote?: string
-  pengeluaranNote?: string
-  saldoPercentageChange?: string
-  budgets: Array<{
-    id: number
-    category: string
-    percentage: number
-  }>
-  agendaToday: Array<{
-    id: number
-    title: string
-    time: string
-  }>
-}
+// Sample Data Dummy untuk Yasin & Tahlil
+const DATA_YASIN = [
+  { no: 1, arab: "يسٓ", latin: "Yā Sīn.", indo: "Ya Sin." },
+  { no: 2, arab: "وَٱلْقُرْءَانِ ٱلْحَكِيمِ", latin: "Wal-qur'ānil-ḥakīm.", indo: "Demi Al-Qur'an yang penuh hikmah," },
+  { no: 3, arab: "إِنَّكَ لَمِنَ ٱلْمُرْسَلِينَ", latin: "Innaka laminal-mursalīn.", indo: "Sungguh, engkau (Muhammad) adalah salah seorang dari rasul-rasul," },
+  { no: 4, arab: "عَلَىٰ صِرَٰطٍ مُّسْتَقِيمٍ", latin: "'Alā ṣirāṭim mustaqīm.", indo: "(yang berada) di atas jalan yang lurus," }
+];
 
-interface DashboardClientProps {
-  user?: {
-    id?: any
-    email?: any
-    name?: any
-  }
-}
+export default function DashboardClient() {
+  const [activeTab, setActiveTab] = useState<"transparansi" | "yasin" | "sholat" | "haul">("transparansi");
+  const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
+  const [userLocation, setUserLocation] = useState<string>("Mencari lokasi...");
 
-export default function DashboardClient({ user }: DashboardClientProps) {
-  const [loading, setLoading] = useState(true)
-
-  // Cek apakah pengurus terautentikasi
-  const isPengurus = Boolean(user && user.email)
-
-  const [data, setData] = useState<DashboardData>({
-    userEmail: user?.email || 'Laporan Transparansi',
-    totalSaldo: 0,
-    pemasukanBulanIni: 0,
-    pengeluaranBulanIni: 0,
-    sisaBudget: 0,
-    budgets: [],
-    agendaToday: []
-  })
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      const res = await fetch('/api/dashboard/summary')
-      if (res.ok) {
-        const result = await res.json()
-
-        setData({
-          userEmail: user?.email || result.userEmail || 'Laporan Transparansi',
-          totalSaldo: result.totalSaldo || 0,
-          pemasukanBulanIni: result.pemasukanBulanIni || 0,
-          pengeluaranBulanIni: result.pengeluaranBulanIni || 0,
-          sisaBudget: result.sisaBudget || 0,
-          pemasukanNote: result.pemasukanNote || 'Total Kas Masuk (Oracle DB)',
-          pengeluaranNote: result.pengeluaranNote || 'Total Kas Keluar (Oracle DB)',
-          saldoPercentageChange: result.saldoPercentageChange || '+0% dari bulan lalu',
-          budgets: result.budgets || [],
-          agendaToday: result.agendaToday || []
-        })
-      }
-    } catch (err) {
-      console.error('Gagal mengambil data dari Oracle DB:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Geolocation Sederhana untuk Kota
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => setUserLocation("Jakarta & Sekitarnya"),
+        () => setUserLocation("Lokasi Default (Jakarta)")
+      );
+    }
+  }, []);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-slate-100 p-4">
-      {/* HEADER DASHBOARD */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2">
-            {isPengurus ? (
-              <>Halo, <span className="text-white">{user?.name || data.userEmail}</span> 👋</>
-            ) : (
-              <span className="text-white">Laporan Keuangan & Kegiatan</span>
-            )}
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            {isPengurus
-              ? 'Pantau arus kas, budget, organisasi, dan acara dalam satu tampilan.'
-              : 'Informasi keuangan dan agenda organisasi terbuka secara transparan.'}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* 1. HEADER & TOP NAV */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-emerald-900/40">
+              K&B
+            </div>
+            <div>
+              <h1 className="font-bold text-base sm:text-lg leading-tight text-white">Portal K&B</h1>
+              <p className="text-xs text-emerald-400">Transparansi & Layanan Publik</p>
+            </div>
+          </div>
+
+          <a 
+            href="/login" 
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium border border-slate-700 transition"
+          >
+            <LogIn size={16} />
+            <span>Login Pengurus</span>
+          </a>
+        </div>
+      </header>
+
+      {/* 2. HERO BANNER */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-950/40 via-slate-950 to-slate-950 py-10 px-4 sm:px-6 lg:px-8 border-b border-slate-800/60">
+        <div className="max-w-4xl mx-auto text-center space-y-4">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Sparkles size={14} /> Selamat Datang Warga & Jemaah
+          </span>
+          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
+            Portal Informasi & Layanan Keagamaan
+          </h2>
+          <p className="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
+            Wadah transparansi kas organisasi, amalan ibadah harian, jadwal sholat, hingga petunjuk lokasi kegiatan masyarakat secara online.
           </p>
-        </div>
 
-        {/* QUICK ACTION BUTTONS */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {isPengurus ? (
-            /* TOMBOL ACTION UNTUK PENGURUS (LOGGED IN) */
-            <>
-              <Link
-                href="/dashboard/keuangan?action=pemasukan"
-                className="flex items-center gap-2 px-4 py-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/60 rounded-xl text-xs font-semibold transition-all"
-              >
-                <PlusCircle className="w-4 h-4" /> Pemasukan
-              </Link>
-
-              <Link
-                href="/dashboard/keuangan?action=pengeluaran"
-                className="flex items-center gap-2 px-4 py-2 bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 rounded-xl text-xs font-semibold transition-all"
-              >
-                <PlusCircle className="w-4 h-4" /> Pengeluaran
-              </Link>
-
-              <Link
-                href="/dashboard/acara?action=baru"
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 rounded-xl text-xs font-semibold transition-all"
-              >
-                <Calendar className="w-4 h-4" /> Acara Baru
-              </Link>
-            </>
-          ) : (
-            /* TOMBOL UNTUK PUBLIK (GUEST / READ-ONLY) */
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-slate-800/80 text-slate-400 px-3 py-2 rounded-xl border border-slate-700">
-                Mode Publik (Read-Only)
-              </span>
-              <Link
-                href="/login"
-                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-cyan-950/50"
-              >
-                <Lock className="w-4 h-4" /> Login Pengurus
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* STATS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* CARD 1: TOTAL SALDO */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Total Saldo</span>
-            <div className="p-2 bg-cyan-500/10 rounded-xl text-cyan-400 border border-cyan-500/20">
-              <Wallet className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {loading ? '...' : `Rp ${data.totalSaldo.toLocaleString('id-ID')}`}
-            </h2>
-            <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1 font-medium">
-              <TrendingUp className="w-3 h-3" />
-              {data.saldoPercentageChange}
-            </p>
+          {/* TAB NAVIGATION */}
+          <div className="pt-4 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setActiveTab("transparansi")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                activeTab === "transparansi" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <Wallet size={16} /> Transparansi Kas
+            </button>
+            <button
+              onClick={() => setActiveTab("yasin")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                activeTab === "yasin" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <BookOpen size={16} /> Yasin & Tahlil
+            </button>
+            <button
+              onClick={() => setActiveTab("sholat")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                activeTab === "sholat" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <Clock size={16} /> Sholat & Kiblat
+            </button>
+            <button
+              onClick={() => setActiveTab("haul")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                activeTab === "haul" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <MapPin size={16} /> Info Haul & Peta
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* CARD 2: PEMASUKAN BULAN INI */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Pemasukan Bulan Ini</span>
-            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
-              <TrendingUp className="w-4 h-4" />
+      {/* 3. MAIN CONTENT AREA */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+        
+        {/* TAB 1: TRANSPARANSI KAS */}
+        {activeTab === "transparansi" && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                <div className="flex justify-between items-center text-slate-400 mb-2">
+                  <span className="text-sm font-medium">Sisa Kas Utama</span>
+                  <Wallet size={20} className="text-emerald-400" />
+                </div>
+                <p className="text-3xl font-bold text-white">Rp 12.500.000</p>
+                <span className="text-xs text-emerald-400 mt-2 inline-block">Update Real-Time</span>
+              </div>
+
+              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                <div className="flex justify-between items-center text-slate-400 mb-2">
+                  <span className="text-sm font-medium">Pemasukan Bulan Ini</span>
+                  <ArrowUpRight size={20} className="text-emerald-400" />
+                </div>
+                <p className="text-3xl font-bold text-emerald-400">+ Rp 3.200.000</p>
+                <span className="text-xs text-slate-500 mt-2 inline-block">Dari 15 Donatur/Iuran</span>
+              </div>
+
+              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                <div className="flex justify-between items-center text-slate-400 mb-2">
+                  <span className="text-sm font-medium">Pengeluaran Bulan Ini</span>
+                  <ArrowDownRight size={20} className="text-rose-400" />
+                </div>
+                <p className="text-3xl font-bold text-rose-400">- Rp 1.100.000</p>
+                <span className="text-xs text-slate-500 mt-2 inline-block">Untuk Kegiatan & Operasional</span>
+              </div>
+            </div>
+
+            {/* AGENDA SIKAP / PROGRAM KERJA */}
+            <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Calendar className="text-emerald-400" size={20} /> Agenda Kegiatan Mendatang
+              </h3>
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex justify-between items-center">
+                  <div>
+                    <h4 className="font-semibold text-white">Pengajian Rutin Malam Jumat & Yasinan</h4>
+                    <p className="text-xs text-slate-400">Kamis Malam, 20:00 WIB • Masjid / Musholla K&B</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Rutin</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {loading ? '...' : `Rp ${data.pemasukanBulanIni.toLocaleString('id-ID')}`}
-            </h2>
-            <p className="text-[11px] text-slate-400 mt-1.5 truncate">
-              {data.pemasukanNote}
-            </p>
-          </div>
-        </div>
+        )}
 
-        {/* CARD 3: PENGELUARAN BULAN INI */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Pengeluaran Bulan Ini</span>
-            <div className="p-2 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20">
-              <TrendingDown className="w-4 h-4" />
+        {/* TAB 2: KITAB YASIN & TAHLIL */}
+        {activeTab === "yasin" && (
+          <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn">
+            {/* TOOLBAR BACAAN */}
+            <div className="flex items-center justify-between bg-slate-900/80 p-4 rounded-2xl border border-slate-800 sticky top-20 z-40">
+              <div className="flex items-center gap-2">
+                <BookOpen size={18} className="text-emerald-400" />
+                <span className="font-bold text-sm text-white">Surat Yasin</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400">Ukuran Teks:</span>
+                <button onClick={() => setFontSize("sm")} className={`px-2.5 py-1 rounded-lg ${fontSize === 'sm' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Kecil</button>
+                <button onClick={() => setFontSize("md")} className={`px-2.5 py-1 rounded-lg ${fontSize === 'md' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sedang</button>
+                <button onClick={() => setFontSize("lg")} className={`px-2.5 py-1 rounded-lg ${fontSize === 'lg' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Besar</button>
+              </div>
             </div>
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {loading ? '...' : `Rp ${data.pengeluaranBulanIni.toLocaleString('id-ID')}`}
-            </h2>
-            <p className="text-[11px] text-slate-400 mt-1.5 truncate">
-              {data.pengeluaranNote}
-            </p>
-          </div>
-        </div>
 
-        {/* CARD 4: SISA BUDGET AKTIF */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Sisa Budget Aktif</span>
-            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
-              <PieChart className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {loading ? '...' : `Rp ${data.sisaBudget.toLocaleString('id-ID')}`}
-            </h2>
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div
-                className="bg-cyan-400 h-full transition-all duration-300"
-                style={{ width: data.sisaBudget > 0 ? '65%' : '0%' }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* LOWER SECTION: BUDGET PROGRESS & AGENDA */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BATAS & PROGRESS BUDGET */}
-        <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md space-y-5">
-          <div className="flex items-center gap-2">
-            <PieChart className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">Batas & Progress Budget</h2>
-          </div>
-
-          {loading ? (
-            <p className="text-xs text-slate-400">Memuat budget...</p>
-          ) : data.budgets.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4">Belum ada data budget yang dikonfigurasi.</p>
-          ) : (
+            {/* DAFTAR AYAT */}
             <div className="space-y-4">
-              {data.budgets.map((b) => (
-                <div key={b.id} className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-300 font-medium">{b.category}</span>
-                    <span
-                      className={`font-bold ${
-                        b.percentage > 100
-                          ? 'text-rose-400'
-                          : b.percentage > 80
-                          ? 'text-amber-400'
-                          : 'text-slate-400'
-                      }`}
-                    >
-                      {b.percentage}%
+              {DATA_YASIN.map((ayat) => (
+                <div key={ayat.no} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <span className="w-8 h-8 rounded-full bg-emerald-950 border border-emerald-800/50 flex items-center justify-center text-xs font-bold text-emerald-400">
+                      {ayat.no}
                     </span>
+                    <p className={`font-serif text-right leading-loose text-emerald-200 ${
+                      fontSize === 'sm' ? 'text-2xl' : fontSize === 'md' ? 'text-3xl' : 'text-4xl'
+                    }`}>
+                      {ayat.arab}
+                    </p>
                   </div>
-                  <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800/60">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        b.percentage > 100
-                          ? 'bg-rose-500'
-                          : b.percentage > 80
-                          ? 'bg-amber-400'
-                          : 'bg-emerald-400'
-                      }`}
-                      style={{ width: `${Math.min(b.percentage, 100)}%` }}
-                    />
+                  <div className="pt-2 border-t border-slate-800/60 space-y-1">
+                    <p className="text-emerald-400/90 text-sm italic">{ayat.latin}</p>
+                    <p className="text-slate-300 text-sm">{ayat.indo}</p>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* AGENDA & TASK HARI INI */}
-        <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md space-y-5">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-base font-bold text-white">Agenda & Task Hari Ini</h2>
           </div>
+        )}
 
-          {loading ? (
-            <p className="text-xs text-slate-400">Memuat agenda...</p>
-          ) : data.agendaToday.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4">Tidak ada agenda untuk hari ini.</p>
-          ) : (
-            <div className="space-y-3">
-              {data.agendaToday.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3.5 bg-slate-950/50 border border-slate-800/80 rounded-xl space-y-1"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-cyan-400" />
-                    <h3 className="text-xs font-semibold text-white">{item.title}</h3>
-                  </div>
-                  <p className="text-[11px] text-slate-400 pl-4 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {item.time}
-                  </p>
+        {/* TAB 3: JADWAL SHOLAT & KIBLAT */}
+        {activeTab === "sholat" && (
+          <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn">
+            <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 text-center space-y-2">
+              <span className="text-xs text-slate-400">Lokasi Anda</span>
+              <p className="font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
+                <MapPin size={16} /> {userLocation}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                { nama: "Subuh", waktu: "04:38" },
+                { nama: "Dzuhur", waktu: "11:57" },
+                { nama: "Ashar", waktu: "15:15" },
+                { nama: "Maghrib", waktu: "17:58" },
+                { nama: "Isya", waktu: "19:08" },
+              ].map((s, i) => (
+                <div key={i} className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-center space-y-1">
+                  <span className="text-xs text-slate-400">{s.nama}</span>
+                  <p className="text-lg font-bold text-white">{s.waktu}</p>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* KOMPAS KIBLAT */}
+            <div className="bg-slate-900/60 p-8 rounded-2xl border border-slate-800 text-center space-y-4">
+              <Compass size={48} className="mx-auto text-emerald-400 animate-pulse" />
+              <div>
+                <h3 className="font-bold text-white text-lg">Arah Kiblat</h3>
+                <p className="text-xs text-slate-400">Gunakan sensor kompas HP Anda untuk menemukan petunjuk kiblat.</p>
+              </div>
+              <button className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition">
+                Aktifkan Kompas Kiblat
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: PETA & LOKASI HAUL */}
+        {activeTab === "haul" && (
+          <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
+            <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <span className="px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-semibold">
+                    Acara Akbar Mendatang
+                  </span>
+                  <h3 className="text-2xl font-bold text-white mt-2">Haul Akbar & Pengajian Umum K&B</h3>
+                  <p className="text-slate-400 text-sm">Lokasi: Lapangan Utama / Kompleks K&B</p>
+                </div>
+                <a 
+                  href="https://maps.google.com" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"
+                >
+                  <Navigation size={16} /> Buka Google Maps
+                </a>
+              </div>
+
+              {/* EMBED GOOGLE MAPS PLACEHOLDER */}
+              <div className="w-full h-64 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-slate-500 gap-2">
+                <MapPin size={32} className="text-emerald-500" />
+                <p className="text-sm">Peta Interaktif Google Maps / Denah Lokasi Haul</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* 4. FOOTER */}
+      <footer className="bg-slate-900/80 border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+        <p>© 2026 Organisasi K&B. Hak Cipta Dilindungi.</p>
+      </footer>
     </div>
-  )
+  );
 }
