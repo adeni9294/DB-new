@@ -1,3 +1,8 @@
+import DashboardClient from '@/components/DashboardClient' // Sesuaikan path lokasi DashboardClient kamu
+
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
-  return null // biar langsung di handle middleware
+  // Langsung tampilkan dashboard untuk publik (Read-Only)
+  return <DashboardClient />
 }
