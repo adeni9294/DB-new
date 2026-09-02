@@ -1,49 +1,95 @@
 'use client'
 
-import React, { useState } from 'react'
-import { User, Lock, Bell, ShieldCheck, Save, KeyRound } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { User, Lock, Bell, Save, KeyRound, ShieldCheck } from 'lucide-react'
 
 export default function PengaturanPage() {
   const [activeTab, setActiveTab] = useState<'profil' | 'keamanan' | 'notifikasi'>('profil')
 
-  // State Form Profil
-  const [fullName, setFullName] = useState('Adeni')
-  const [email, setEmail] = useState('adeni9294@gmail.com')
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
   const [role, setRole] = useState('Administrator')
 
-  // State Form Password
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  // State Notifikasi
   const [emailNotify, setEmailNotify] = useState(true)
   const [budgetAlert, setBudgetAlert] = useState(true)
 
   const [message, setMessage] = useState('')
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  // 1. Fetch Data User dari Oracle
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await fetch('/api/user/profile')
+        if (res.ok) {
+          const data = await res.json()
+          setFullName(data.name || '')
+          setEmail(data.email || '')
+          setRole(data.role || 'Administrator')
+        }
+      } catch (err) {
+        console.error('Gagal mengambil data profil:', err)
+      }
+    }
+
+    fetchUserProfile()
+  }, [])
+
+  // 2. Update Profil ke Oracle DB
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
-    setMessage('Profil berhasil diperbarui!')
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: fullName, email })
+      })
+
+      if (res.ok) {
+        setMessage('Profil berhasil diperbarui ke Oracle Database!')
+      } else {
+        setMessage('Gagal memperbarui profil.')
+      }
+    } catch (err) {
+      setMessage('Terjadi kesalahan koneksi.')
+    }
     setTimeout(() => setMessage(''), 3000)
   }
 
-  const handleSaveSecurity = (e: React.FormEvent) => {
+  // 3. Update Password ke Oracle DB
+  const handleSaveSecurity = async (e: React.FormEvent) => {
     e.preventDefault()
     if (newPassword !== confirmPassword) {
       setMessage('Konfirmasi kata sandi tidak cocok!')
       return
     }
-    setMessage('Kata sandi berhasil diubah!')
-    setCurrentPassword('')
-    setNewPassword('')
-    setConfirmPassword('')
+
+    try {
+      const res = await fetch('/api/user/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword })
+      })
+
+      if (res.ok) {
+        setMessage('Kata sandi berhasil diubah!')
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      } else {
+        setMessage('Gagal mengubah kata sandi.')
+      }
+    } catch (err) {
+      setMessage('Terjadi kesalahan koneksi.')
+    }
     setTimeout(() => setMessage(''), 3000)
   }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto text-slate-100">
-      {/* HEADER PAGE */}
       <div>
         <h1 className="text-2xl font-bold">Pengaturan</h1>
         <p className="text-sm text-slate-400 mt-1">
@@ -51,7 +97,6 @@ export default function PengaturanPage() {
         </p>
       </div>
 
-      {/* NOTIFIKASI SUKSES / ERROR */}
       {message && (
         <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-medium transition-all">
           {message}
@@ -59,7 +104,6 @@ export default function PengaturanPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* SIDEBAR TAB PENGATURAN */}
         <div className="space-y-1">
           <button
             onClick={() => setActiveTab('profil')}
@@ -95,9 +139,7 @@ export default function PengaturanPage() {
           </button>
         </div>
 
-        {/* KONTEN TAB */}
         <div className="md:col-span-3 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md">
-          {/* TAB 1: PROFIL AKUN */}
           {activeTab === 'profil' && (
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -147,7 +189,6 @@ export default function PengaturanPage() {
             </form>
           )}
 
-          {/* TAB 2: KEAMANAN */}
           {activeTab === 'keamanan' && (
             <form onSubmit={handleSaveSecurity} className="space-y-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
@@ -200,7 +241,6 @@ export default function PengaturanPage() {
             </form>
           )}
 
-          {/* TAB 3: NOTIFIKASI */}
           {activeTab === 'notifikasi' && (
             <div className="space-y-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
