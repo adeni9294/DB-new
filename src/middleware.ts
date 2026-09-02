@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  const userCookie = request.cookies.get('user')
   const { pathname } = request.nextUrl
 
+  // Always allow API, internal Next assets and favicon through
+  if (pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
+    return NextResponse.next()
+  }
+
+  const userCookie = request.cookies.get('user')
   const isLoggedIn = !!userCookie
 
   // Jika SUDAH login dan mencoba buka halaman login/register,
@@ -13,7 +18,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Semua halaman lain (termasuk '/', '/dashboard', '/keuangan', dll) 
+  // Semua halaman lain (termasuk '/', '/dashboard', '/keuangan', dll)
   // diizinkan diakses bebas oleh siapa saja (Mode Publik / Read-Only).
   return NextResponse.next()
 }
