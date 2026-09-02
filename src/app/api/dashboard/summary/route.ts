@@ -1,24 +1,21 @@
 import { NextResponse } from 'next/server'
-import { getConnection } from '@/lib/oracle/pool'
+import { executeQuery } from '@/lib/oracle/pool'
 
 export async function GET() {
-  let connection;
   try {
-    connection = await getConnection()
-
     // 1. Hitung Total Pemasukan
-    const incomeResult = await connection.execute(
+    const incomeResult: any = await executeQuery(
       `SELECT NVL(SUM(amount), 0) AS TOTAL FROM transactions WHERE LOWER(type) IN ('pemasukan', 'income')`
     )
-    const totalPemasukan = Number((incomeResult.rows as any[])?.[0]?.TOTAL || 0)
+    const totalPemasukan = Number(incomeResult?.rows?.[0]?.TOTAL || 0)
 
     // 2. Hitung Total Pengeluaran
-    const expenseResult = await connection.execute(
+    const expenseResult: any = await executeQuery(
       `SELECT NVL(SUM(amount), 0) AS TOTAL FROM transactions WHERE LOWER(type) IN ('pengeluaran', 'expense')`
     )
-    const totalPengeluaran = Number((expenseResult.rows as any[])?.[0]?.TOTAL || 0)
+    const totalPengeluaran = Number(expenseResult?.rows?.[0]?.TOTAL || 0)
 
-    // 3. Hitung Saldo
+    // 3. Hitung Total Saldo
     const totalSaldo = totalPemasukan - totalPengeluaran
 
     return NextResponse.json({
@@ -41,20 +38,11 @@ export async function GET() {
         { id: 2, title: 'Penutupan Donasi', time: 'Sampai 17 Sep 2026' }
       ]
     })
-
   } catch (error: any) {
     console.error('Database Error:', error)
     return NextResponse.json(
-      { error: 'Gagal mengambil data dari Oracle DB' },
+      { error: 'Gagal mengambil data ringkasan dari Oracle DB' },
       { status: 500 }
     )
-  } finally {
-    if (connection) {
-      try {
-        await connection.close()
-      } catch (err) {
-        console.error(err)
-      }
-    }
   }
 }
