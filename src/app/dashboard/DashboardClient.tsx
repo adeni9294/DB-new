@@ -3,8 +3,19 @@
 import React, { useState, useEffect } from "react";
 import { 
   Wallet, ArrowUpRight, ArrowDownRight, Calendar, MapPin, 
-  BookOpen, Compass, Clock, LogIn, Sparkles, Navigation, Phone, MessageSquare
+  BookOpen, Compass, Clock, LogIn, Sparkles, Navigation
 } from "lucide-react";
+
+type UserType = {
+  id?: number | string;
+  email?: string;
+  name?: string;
+  role?: string;
+};
+
+interface DashboardClientProps {
+  user?: UserType;
+}
 
 // Sample Data Dummy untuk Yasin & Tahlil
 const DATA_YASIN = [
@@ -14,14 +25,14 @@ const DATA_YASIN = [
   { no: 4, arab: "عَلَىٰ صِرَٰطٍ مُّسْتَقِيمٍ", latin: "'Alā ṣirāṭim mustaqīm.", indo: "(yang berada) di atas jalan yang lurus," }
 ];
 
-export default function DashboardClient() {
+export default function DashboardClient({ user }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<"transparansi" | "yasin" | "sholat" | "haul">("transparansi");
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
   const [userLocation, setUserLocation] = useState<string>("Mencari lokasi...");
 
   // Geolocation Sederhana untuk Kota
   useEffect(() => {
-    if (navigator.geolocation) {
+    if (typeof window !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         () => setUserLocation("Jakarta & Sekitarnya"),
         () => setUserLocation("Lokasi Default (Jakarta)")
@@ -35,7 +46,7 @@ export default function DashboardClient() {
       <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-emerald-900/40">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-emerald-900/40">
               K&B
             </div>
             <div>
@@ -45,11 +56,11 @@ export default function DashboardClient() {
           </div>
 
           <a 
-            href="/login" 
+            href={user ? "/dashboard" : "/login"} 
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium border border-slate-700 transition"
           >
             <LogIn size={16} />
-            <span>Login Pengurus</span>
+            <span>{user ? `Halo, ${user.name || 'Pengurus'}` : "Login Pengurus"}</span>
           </a>
         </div>
       </header>
@@ -71,7 +82,7 @@ export default function DashboardClient() {
           <div className="pt-4 flex flex-wrap justify-center gap-2">
             <button
               onClick={() => setActiveTab("transparansi")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
                 activeTab === "transparansi" 
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
                   : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
@@ -81,7 +92,7 @@ export default function DashboardClient() {
             </button>
             <button
               onClick={() => setActiveTab("yasin")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
                 activeTab === "yasin" 
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
                   : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
@@ -91,7 +102,7 @@ export default function DashboardClient() {
             </button>
             <button
               onClick={() => setActiveTab("sholat")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
                 activeTab === "sholat" 
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
                   : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
@@ -101,7 +112,7 @@ export default function DashboardClient() {
             </button>
             <button
               onClick={() => setActiveTab("haul")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
                 activeTab === "haul" 
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
                   : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
@@ -118,7 +129,7 @@ export default function DashboardClient() {
         
         {/* TAB 1: TRANSPARANSI KAS */}
         {activeTab === "transparansi" && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
                 <div className="flex justify-between items-center text-slate-400 mb-2">
@@ -135,7 +146,7 @@ export default function DashboardClient() {
                   <ArrowUpRight size={20} className="text-emerald-400" />
                 </div>
                 <p className="text-3xl font-bold text-emerald-400">+ Rp 3.200.000</p>
-                <span className="text-xs text-slate-500 mt-2 inline-block">Dari 15 Donatur/Iuran</span>
+                <span className="text-xs text-slate-500 mt-2 inline-block">Dari Donatur & Iuran</span>
               </div>
 
               <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
@@ -168,7 +179,7 @@ export default function DashboardClient() {
 
         {/* TAB 2: KITAB YASIN & TAHLIL */}
         {activeTab === "yasin" && (
-          <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn">
+          <div className="max-w-3xl mx-auto space-y-6">
             {/* TOOLBAR BACAAN */}
             <div className="flex items-center justify-between bg-slate-900/80 p-4 rounded-2xl border border-slate-800 sticky top-20 z-40">
               <div className="flex items-center gap-2">
@@ -177,9 +188,9 @@ export default function DashboardClient() {
               </div>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-slate-400">Ukuran Teks:</span>
-                <button onClick={() => setFontSize("sm")} className={`px-2.5 py-1 rounded-lg ${fontSize === 'sm' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Kecil</button>
-                <button onClick={() => setFontSize("md")} className={`px-2.5 py-1 rounded-lg ${fontSize === 'md' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sedang</button>
-                <button onClick={() => setFontSize("lg")} className={`px-2.5 py-1 rounded-lg ${fontSize === 'lg' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Besar</button>
+                <button onClick={() => setFontSize("sm")} className={`px-2.5 py-1 rounded-lg cursor-pointer ${fontSize === 'sm' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Kecil</button>
+                <button onClick={() => setFontSize("md")} className={`px-2.5 py-1 rounded-lg cursor-pointer ${fontSize === 'md' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sedang</button>
+                <button onClick={() => setFontSize("lg")} className={`px-2.5 py-1 rounded-lg cursor-pointer ${fontSize === 'lg' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Besar</button>
               </div>
             </div>
 
@@ -209,7 +220,7 @@ export default function DashboardClient() {
 
         {/* TAB 3: JADWAL SHOLAT & KIBLAT */}
         {activeTab === "sholat" && (
-          <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn">
+          <div className="max-w-3xl mx-auto space-y-6">
             <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 text-center space-y-2">
               <span className="text-xs text-slate-400">Lokasi Anda</span>
               <p className="font-semibold text-emerald-400 flex items-center justify-center gap-1.5">
@@ -239,7 +250,7 @@ export default function DashboardClient() {
                 <h3 className="font-bold text-white text-lg">Arah Kiblat</h3>
                 <p className="text-xs text-slate-400">Gunakan sensor kompas HP Anda untuk menemukan petunjuk kiblat.</p>
               </div>
-              <button className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition">
+              <button className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition cursor-pointer">
                 Aktifkan Kompas Kiblat
               </button>
             </div>
@@ -248,7 +259,7 @@ export default function DashboardClient() {
 
         {/* TAB 4: PETA & LOKASI HAUL */}
         {activeTab === "haul" && (
-          <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
+          <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -268,7 +279,7 @@ export default function DashboardClient() {
                 </a>
               </div>
 
-              {/* EMBED GOOGLE MAPS PLACEHOLDER */}
+              {/* PLACEHOLDER PETA */}
               <div className="w-full h-64 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-slate-500 gap-2">
                 <MapPin size={32} className="text-emerald-500" />
                 <p className="text-sm">Peta Interaktif Google Maps / Denah Lokasi Haul</p>
