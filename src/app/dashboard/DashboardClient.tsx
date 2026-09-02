@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   Wallet,
   TrendingUp,
@@ -10,7 +9,6 @@ import {
   PieChart,
   PlusCircle,
   Calendar,
-  LogOut,
   Clock,
   Lock
 } from 'lucide-react'
@@ -45,7 +43,6 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({ user }: DashboardClientProps) {
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
 
   // Cek apakah pengurus terautentikasi
@@ -92,19 +89,6 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     fetchDashboardData()
   }, [])
 
-  const handleLogout = async () => {
-    try {
-      // Hapus cookie user dari server side
-      await fetch('/api/auth/logout', { method: 'POST' })
-    } catch (err) {
-      console.error('Gagal logout:', err)
-    } finally {
-      localStorage.removeItem('user')
-      router.push('/')
-      router.refresh()
-    }
-  }
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto text-slate-100 p-4">
       {/* HEADER DASHBOARD */}
@@ -127,7 +111,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
         {/* QUICK ACTION BUTTONS */}
         <div className="flex flex-wrap items-center gap-2.5">
           {isPengurus ? (
-            /* TOMBOL UNTUK PENGURUS (LOGGED IN) */
+            /* TOMBOL ACTION UNTUK PENGURUS (LOGGED IN) */
             <>
               <Link
                 href="/dashboard/keuangan?action=pemasukan"
@@ -149,13 +133,6 @@ export default function DashboardClient({ user }: DashboardClientProps) {
               >
                 <Calendar className="w-4 h-4" /> Acara Baru
               </Link>
-
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-rose-400 border border-slate-800 rounded-xl text-xs font-semibold transition-all"
-              >
-                <LogOut className="w-4 h-4" /> Keluar
-              </button>
             </>
           ) : (
             /* TOMBOL UNTUK PUBLIK (GUEST / READ-ONLY) */
