@@ -7,25 +7,18 @@ export function middleware(request: NextRequest) {
 
   const isLoggedIn = !!userCookie
 
-  const publicPaths = ['/login', '/register', '/api/auth/login']
-  const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
-
-  // 1. Kalau belum login dan akses halaman protected -> tendang ke login
-  if (!isLoggedIn && !isPublicPath && pathname !== '/') {
-    const url = new URL('/login', request.url)
-    url.searchParams.set('redirect', pathname) // biar abis login balik ke halaman tujuan
-    return NextResponse.redirect(url)
-  }
-
-  // 2. Kalau UDAH login dan buka /login atau / -> tendang ke dashboard
-  if (isLoggedIn && (pathname === '/login' || pathname === '/')) {
+  // Jika SUDAH login dan mencoba buka halaman login/register,
+  // langsung alihkan ke /dashboard agar tidak login dua kali.
+  if (isLoggedIn && (pathname === '/login' || pathname === '/register')) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Semua halaman lain (termasuk '/', '/dashboard', '/keuangan', dll) 
+  // diizinkan diakses bebas oleh siapa saja (Mode Publik / Read-Only).
   return NextResponse.next()
 }
 
 export const config = {
-  // Cuma jalan di route ini. API dan static gak dicek biar enteng
+  // Jalankan middleware hanya pada rute halaman utama, dashboard, dan auth
   matcher: ['/', '/dashboard/:path*', '/login', '/register'],
 }
