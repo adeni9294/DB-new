@@ -56,50 +56,24 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     agendaToday: []
   })
 
-  // Fetch & Kalkulasi data langsung dari /api/transactions
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/transactions')
+      const res = await fetch('/api/dashboard/summary')
       if (res.ok) {
         const result = await res.json()
-        const rawList = Array.isArray(result) ? result : result.data || []
-
-        let totalPemasukan = 0
-        let totalPengeluaran = 0
-
-        rawList.forEach((item: any) => {
-          const type = (item.TYPE || item.type || '').toLowerCase()
-          const amount = Number(item.AMOUNT || item.amount || 0)
-
-          if (type === 'pemasukan' || type === 'income') {
-            totalPemasukan += amount
-          } else if (type === 'pengeluaran' || type === 'expense') {
-            totalPengeluaran += amount
-          }
-        })
-
-        const totalSaldo = totalPemasukan - totalPengeluaran
 
         setData({
-          userEmail: user?.email || 'adeni9294@gmail.com',
-          totalSaldo,
-          pemasukanBulanIni: totalPemasukan,
-          pengeluaranBulanIni: totalPengeluaran,
-          sisaBudget: 3180000,
-          pemasukanNote: 'Total Kas Masuk (Oracle DB)',
-          pengeluaranNote: 'Total Kas Keluar (Oracle DB)',
-          saldoPercentageChange: '+0% dari bulan lalu',
-          budgets: [
-            { id: 1, category: 'Makanan & Minuman', percentage: 70 },
-            { id: 2, category: 'Transportasi', percentage: 45 },
-            { id: 3, category: 'Kas Organisasi K&B', percentage: 82 },
-            { id: 4, category: 'Acara Seminar Kit', percentage: 104 }
-          ],
-          agendaToday: [
-            { id: 1, title: 'Rapat Koordinasi', time: '10:00 - 11:30' },
-            { id: 2, title: 'Penutupan Donasi', time: 'Sampai 17 Sep 2026' }
-          ]
+          userEmail: result.userEmail || user?.email || 'adeni9294@gmail.com',
+          totalSaldo: result.totalSaldo || 0,
+          pemasukanBulanIni: result.pemasukanBulanIni || 0,
+          pengeluaranBulanIni: result.pengeluaranBulanIni || 0,
+          sisaBudget: result.sisaBudget || 0,
+          pemasukanNote: result.pemasukanNote || 'Total Kas Masuk (Oracle DB)',
+          pengeluaranNote: result.pengeluaranNote || 'Total Kas Keluar (Oracle DB)',
+          saldoPercentageChange: result.saldoPercentageChange || '+0% dari bulan lalu',
+          budgets: result.budgets || [],
+          agendaToday: result.agendaToday || []
         })
       }
     } catch (err) {
@@ -179,7 +153,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
             </h2>
             <p className="text-[11px] text-emerald-400 mt-1.5 flex items-center gap-1 font-medium">
               <TrendingUp className="w-3 h-3" />
-              {data.saldoPercentageChange || '+0% dari bulan lalu'}
+              {data.saldoPercentageChange}
             </p>
           </div>
         </div>
@@ -197,7 +171,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
               {loading ? '...' : `Rp ${data.pemasukanBulanIni.toLocaleString('id-ID')}`}
             </h2>
             <p className="text-[11px] text-slate-400 mt-1.5 truncate">
-              {data.pemasukanNote || 'Arus kas masuk'}
+              {data.pemasukanNote}
             </p>
           </div>
         </div>
@@ -215,7 +189,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
               {loading ? '...' : `Rp ${data.pengeluaranBulanIni.toLocaleString('id-ID')}`}
             </h2>
             <p className="text-[11px] text-slate-400 mt-1.5 truncate">
-              {data.pengeluaranNote || 'Operasional & Kegiatan'}
+              {data.pengeluaranNote}
             </p>
           </div>
         </div>
@@ -233,7 +207,10 @@ export default function DashboardClient({ user }: DashboardClientProps) {
               {loading ? '...' : `Rp ${data.sisaBudget.toLocaleString('id-ID')}`}
             </h2>
             <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
-              <div className="bg-cyan-400 h-full w-[65%]" />
+              <div
+                className="bg-cyan-400 h-full transition-all duration-300"
+                style={{ width: data.sisaBudget > 0 ? '65%' : '0%' }}
+              />
             </div>
           </div>
         </div>
@@ -249,9 +226,9 @@ export default function DashboardClient({ user }: DashboardClientProps) {
           </div>
 
           {loading ? (
-            <p className="text-xs text-slate-400">Memuat budget dari database...</p>
+            <p className="text-xs text-slate-400">Memuat budget...</p>
           ) : data.budgets.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4">Belum ada data budget di Oracle DB.</p>
+            <p className="text-xs text-slate-500 py-4">Belum ada data budget yang dikonfigurasi.</p>
           ) : (
             <div className="space-y-4">
               {data.budgets.map((b) => (
@@ -260,7 +237,11 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                     <span className="text-slate-300 font-medium">{b.category}</span>
                     <span
                       className={`font-bold ${
-                        b.percentage > 100 ? 'text-rose-400' : b.percentage > 80 ? 'text-amber-400' : 'text-slate-400'
+                        b.percentage > 100
+                          ? 'text-rose-400'
+                          : b.percentage > 80
+                          ? 'text-amber-400'
+                          : 'text-slate-400'
                       }`}
                     >
                       {b.percentage}%
