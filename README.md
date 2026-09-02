@@ -1,0 +1,1 @@
+Updated TypeScript typing for oracle pool to avoid build error in CI: change pool type to any.

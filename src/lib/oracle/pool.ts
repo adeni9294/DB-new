@@ -3,7 +3,7 @@ import oracledb from 'oracledb';
 // force out format
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 
-let pool: oracledb.Pool | null = null;
+let pool: any = null;
 
 async function withTimeout<T>(p: Promise<T>, ms: number) {
   let timer: NodeJS.Timeout;
@@ -42,7 +42,7 @@ export async function executeQuery(sql: string, binds: any = {}, opts: any = {})
   const autoCommit = opts.autoCommit ?? true;
 
   const dbPool = await getPool();
-  let connection: oracledb.Connection | undefined;
+  let connection: any | undefined;
   try {
     connection = await withTimeout(dbPool.getConnection(), 5000);
   } catch (err) {
