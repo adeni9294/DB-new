@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { executeQuery } from '@/lib/oracle/pool'
 
+// Mencegah Next.js memanggil database saat proses build/prerender
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     // 1. Hitung Total Pemasukan
