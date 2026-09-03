@@ -1,51 +1,43 @@
 import { executeQuery } from '../pool';
 
-export interface AuditLogDTO {
-  userId: string;
-  action: string;
-  module: string;
-  recordId: string;
-  oldValue?: string;
-  newValue?: string;
-}
-
-export async function executeAuditLog(log: AuditLogDTO): Promise<void> {
-  const sql = `
-    INSERT INTO audit_logs (user_id, action, module, record_id, old_value, new_value)
-    VALUES (:userId, :action, :module, :recordId, :oldValue, :newValue)
-  `;
-  try {
-    await executeQuery(sql, {
-      userId: log.userId,
-      action: log.action,
-      module: log.module,
-      recordId: log.recordId,
-      oldValue: log.oldValue || null,
-      newValue: log.newValue || null,
-    });
-  } catch (err) {
-    console.error('❌ Audit Logging Error:', err);
-  }
-}
-
 export interface TransactionDTO {
   amount: number;
-  accountId: string;
+  accountId?: string;
   type: string;
   category?: string;
-  category_id?: string;
-  notes?: string;       // Disesuaikan dengan nama kolom DB
-  title?: string;       // Tambahkan support untuk input 'title' dari frontend
-  description?: string; // Menyimpan fallback jika ada yang memanggil 'description'
+  notes?: string;
+  title?: string;
+  description?: string;
   date?: string;
-  userId: string;
-  [key: string]: any;   // Mencegah error tipe di build Vercel
+  userId?: string;
+  [key: string]: any;
 }
 
 export async function createTransaction(data: TransactionDTO): Promise<string> {
   const transactionId = 'TRX-' + Date.now();
   const notesContent = data.notes || data.title || data.description || '';
 
+  // 1. Ambil USER_ID valid dari tabel USERS (jika tidak dikirim/invalid)
+  let activeUserId = data.userId;
+  if (!activeUserId) {
+    const userRes: any = await executeQuery(`SELECT id FROM users FETCH FIRST 1 ROWS ONLY`);
+    if (userRes?.rows?.[0]?.ID || userRes?.rows?.[0]?.id) {
+      activeUserId = userRes.rows[0].ID || userRes.rows[0].id;
+    }
+  }
+
+  // 2. Ambil ACCOUNT_ID valid dari tabel ACCOUNTS (jika tidak dikirim/invalid)
+  let activeAccountId = data.accountId;
+  if (!activeAccountId || activeAccountId === 'DEFAULT_ACCOUNT') {
+    const accRes: any = await executeQuery(`SELECT id FROM accounts FETCH FIRST 1 ROWS ONLY`);
+    if (accRes?.rows?.[0]?.ID || accRes?.rows?.[0]?.id) {
+      activeAccountId = accRes.rows[0].ID || accRes.rows[0].id;
+    } else {
+      activeAccountId = null; // Set null jika kolom mengizinkan NULL
+    }
+  }
+
+  // 3. Insert transaksi dengan ID referensi yang aman
   const sql = `
     INSERT INTO transactions (id, amount, account_id, type, notes, user_id, transaction_date)
     VALUES (:id, :amount, :accountId, :type, :notes, :userId, SYSDATE)
@@ -54,10 +46,10 @@ export async function createTransaction(data: TransactionDTO): Promise<string> {
   await executeQuery(sql, {
     id: transactionId,
     amount: data.amount,
-    accountId: data.accountId,
+    accountId: activeAccountId,
     type: data.type,
     notes: notesContent,
-    userId: data.userId,
+    userId: activeUserId,
   });
 
   return transactionId;
