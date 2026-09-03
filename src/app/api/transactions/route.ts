@@ -4,15 +4,20 @@ import { NextResponse } from 'next/server';
 import { createTransaction } from '@/lib/oracle/repositories/transactionRepository';
 import { executeQuery } from '@/lib/oracle/pool';
 
-function parseStringValue(val: any): string {
+// Helper khusus untuk mengekstrak string murni dari berbagai tipe data Oracle (Object, CLOB, Buffer, dsb)
+function toCleanString(val: any): string {
   if (val === null || val === undefined) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number') return String(val);
+  
+  // Jika Oracle mengembalikan Objek Wrapper (CLOB / Column Object)
   if (typeof val === 'object') {
-    if (val.val !== undefined) return String(val.val);
-    if (val.value !== undefined) return String(val.value);
-    if (val.text !== undefined) return String(val.text);
+    if (val.val !== undefined) return toCleanString(val.val);
+    if (val.value !== undefined) return toCleanString(val.value);
+    if (val.text !== undefined) return toCleanString(val.text);
+    if (Buffer.isBuffer(val)) return val.toString('utf-8');
   }
+  
   return String(val);
 }
 
@@ -31,48 +36,33 @@ export async function GET() {
     
     const result: any = await executeQuery(sql);
     
-    // Ambil baris data murni saja
-    let rawRows: any[] = [];
-    if (result && Array.isArray(result.rows)) {
-      rawRows = result.rows;
-    } else if (Array.isArray(result)) {
-      rawRows = result;
-    }
+    const rawRows = result?.rows || (Array.isArray(result) ? result : []);
 
-    // Bersihkan circular references dari setiap baris
-    const cleanRows = rawRows.map((row: any) => {
+    const formattedData = rawRows.map((row: any) => {
+      let rawId, rawNotes, rawAmount, rawType, rawDate;
+
       if (Array.isArray(row)) {
-        return row.map(item => (typeof item === 'object' ? parseStringValue(item) : item));
+        // Jika format query berupa ARRAY [id, notes, amount, type, trx_date]
+        [rawId, rawNotes, rawAmount, rawType, rawDate] = row;
+      } else if (row && typeof row === 'object') {
+        // Jika format query berupa OBJECT { ID, NOTES, ... }
+        rawId = row.ID ?? row.id;
+        rawNotes = row.NOTES ?? row.notes;
+        rawAmount = row.AMOUNT ?? row.amount;
+        rawType = row.TYPE ?? row.type;
+        rawDate = row.TRX_DATE ?? row.trx_date;
       }
-      if (row && typeof row === 'object') {
-        const cleanObj: Record<string, any> = {};
-        for (const key of Object.keys(row)) {
-          const val = row[key];
-          cleanObj[key] = typeof val === 'object' ? parseStringValue(val) : val;
-        }
-        return cleanObj;
-      }
-      return row;
-    });
 
-    // Mapping ke format JSON murni
-    const formattedData = cleanRows.map((row: any) => {
-      const rawId = row.ID ?? row.id ?? row[0];
-      const rawNotes = row.NOTES ?? row.notes ?? row[1];
-      const rawAmount = row.AMOUNT ?? row.amount ?? row[2];
-      const rawType = row.TYPE ?? row.type ?? row[3];
-      const rawDate = row.TRX_DATE ?? row.trx_date ?? row[4];
-
-      const notesText = parseStringValue(rawNotes);
+      const notesText = toCleanString(rawNotes);
 
       return {
-        id: parseStringValue(rawId),
+        id: toCleanString(rawId),
         notes: notesText,
         title: notesText || 'Transaksi',
-        amount: Number(parseStringValue(rawAmount)) || 0,
-        type: parseStringValue(rawType).toLowerCase() || 'income',
+        amount: Number(toCleanString(rawAmount)) || 0,
+        type: toCleanString(rawType).toLowerCase() || 'pemasukan',
         category: 'Umum',
-        date: parseStringValue(rawDate)
+        date: toCleanString(rawDate)
       };
     });
 
