@@ -31,43 +31,34 @@ export interface TransactionFilterParams {
 }
 
 export async function createTransaction(payload: TransactionDTO) {
-  const transactionId = 'TRX-' + Date.now();
-  const notesContent = payload.notes || payload.title || '';
+  try {
+    // Gunakan ID berupa angka unik agar aman untuk kolom ID ber-tipe NUMBER/VARCHAR
+    const rawId = Date.now(); 
+    const notesContent = payload.notes || payload.title || '';
+    const transactionDate = payload.date || new Date().toISOString().split('T')[0];
 
-  // 1. Dapatkan USER_ID yang valid (ambil ID=1 dari DB jika tidak ada/salah)
-  let activeUserId: any = payload.userId;
-  if (!activeUserId || activeUserId === 'USER-001') {
-    try {
+    // Coba ambil user_id valid dari tabel users jika tidak disediakan
+    let activeUserId: any = payload.userId;
+    if (!activeUserId) {
       const userRes: any = await executeQuery(`SELECT id FROM users FETCH FIRST 1 ROWS ONLY`);
       if (userRes?.rows?.[0]) {
-        activeUserId = userRes.rows[0].ID ?? userRes.rows[0].id ?? 1;
+        activeUserId = userRes.rows[0].ID ?? userRes.rows[0].id;
       } else {
         activeUserId = 1;
       }
-    } catch {
-      activeUserId = 1;
     }
-  }
 
-  // 2. Dapatkan ACCOUNT_ID yang valid dari tabel ACCOUNTS
-  let activeAccountId: any = payload.accountId;
-  if (!activeAccountId || activeAccountId === 'DEFAULT_ACCOUNT') {
-    try {
+    // Coba ambil account_id valid dari tabel accounts jika tidak disediakan
+    let activeAccountId: any = payload.accountId;
+    if (!activeAccountId || activeAccountId === 'DEFAULT_ACCOUNT') {
       const accRes: any = await executeQuery(`SELECT id FROM accounts FETCH FIRST 1 ROWS ONLY`);
       if (accRes?.rows?.[0]) {
         activeAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
       } else {
-        activeAccountId = null; // Set null jika belum ada akun
+        activeAccountId = null;
       }
-    } catch {
-      activeAccountId = null;
     }
-  }
 
-  const transactionDate = payload.date || new Date().toISOString().split('T')[0];
-
-  // 3. Eksekusi Query INSERT dengan ID dan FK yang aman
-  try {
     const sql = `
       INSERT INTO transactions (
         id,
@@ -89,35 +80,30 @@ export async function createTransaction(payload: TransactionDTO) {
     `;
 
     const binds = {
-      id: transactionId,
+      id: rawId,
       userId: activeUserId,
       accountId: activeAccountId,
-      type: payload.type,
-      amount: payload.amount,
+      type: payload.type || 'INCOME',
+      amount: Number(payload.amount),
       notes: notesContent,
       transactionDate: transactionDate,
     };
 
+    console.log('📌 Executing Transaction Binds:', binds);
     const result = await executeQuery(sql, binds);
     return result;
+
   } catch (err: any) {
-    // Fallback jika account_id bernilai NULL dan kolomnya tidak mengizinkan NULL
-    console.error('❌ Insert transaksi gagal, mencoba tanpa account_id:', err?.message);
-    const fallbackSql = `
-      INSERT INTO transactions (
-        id, user_id, type, amount, notes, transaction_date
-      ) VALUES (
-        :id, :userId, :type, :amount, :notes, TO_DATE(:transactionDate, 'YYYY-MM-DD')
-      )
-    `;
-    return await executeQuery(fallbackSql, {
-      id: transactionId,
-      userId: activeUserId,
-      type: payload.type,
-      amount: payload.amount,
-      notes: notesContent,
-      transactionDate: transactionDate,
+    // Log detail error Oracle DB ke Vercel Runtime Logs / Terminal
+    console.error('❌ CRITICAL ORACLE DB ERROR:', {
+      message: err?.message,
+      code: err?.code,
+      stack: err?.stack,
+      oracleErrorNumber: err?.errorNum
     });
+    
+    // Throw error kembali agar API Route mengirim pesan detailnya ke Frontend
+    throw new Error(err?.message || 'Gagal menyimpan transaksi ke Oracle DB');
   }
 }
 
