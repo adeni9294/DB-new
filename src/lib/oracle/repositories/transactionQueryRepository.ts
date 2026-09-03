@@ -22,23 +22,13 @@ export interface TransactionFilterParams {
   [key: string]: any;
 }
 
-// Helper untuk normalisasi tipe transaksi sesuai CHECK CONSTRAINT database
 function normalizeTransactionType(rawType: string): 'INCOME' | 'EXPENSE' | 'TRANSFER' {
   if (!rawType) return 'INCOME';
-  
   const normalized = rawType.trim().toUpperCase();
-  
-  if (normalized === 'PEMASUKAN' || normalized === 'INCOME' || normalized === 'IN') {
-    return 'INCOME';
-  }
-  if (normalized === 'PENGELUARAN' || normalized === 'EXPENSE' || normalized === 'OUT') {
-    return 'EXPENSE';
-  }
-  if (normalized === 'TRANSFER') {
-    return 'TRANSFER';
-  }
-
-  return 'INCOME'; // Default fallback aman
+  if (normalized === 'PEMASUKAN' || normalized === 'INCOME' || normalized === 'IN') return 'INCOME';
+  if (normalized === 'PENGELUARAN' || normalized === 'EXPENSE' || normalized === 'OUT') return 'EXPENSE';
+  if (normalized === 'TRANSFER') return 'TRANSFER';
+  return 'INCOME';
 }
 
 export async function createTransaction(payload: TransactionDTO) {
@@ -46,22 +36,14 @@ export async function createTransaction(payload: TransactionDTO) {
     const rawId = 'TRX-' + Date.now();
     const notesContent = payload.notes || payload.title || payload.description || '';
     const transactionDate = payload.date || new Date().toISOString().split('T')[0];
-
-    // Normalisasi nilai type ke UPPERCASE ('INCOME' | 'EXPENSE' | 'TRANSFER')
     const validTransactionType = normalizeTransactionType(payload.type);
 
-    // 1. Dapatkan USER_ID yang valid
     let validUserId: any = payload.userId;
     if (!validUserId || validUserId === 'USER-001') {
       const userRes: any = await executeQuery(`SELECT id FROM users WHERE ROWNUM <= 1`);
-      if (userRes?.rows?.[0]) {
-        validUserId = userRes.rows[0].ID ?? userRes.rows[0].id;
-      } else {
-        validUserId = 1;
-      }
+      validUserId = userRes?.rows?.[0]?.ID ?? userRes?.rows?.[0]?.id ?? 1;
     }
 
-    // 2. Dapatkan ACCOUNT_ID yang valid
     let validAccountId: any = payload.accountId;
     if (!validAccountId || validAccountId === 'DEFAULT_ACCOUNT' || validAccountId === 'ACC-DEFAULT') {
       const accRes: any = await executeQuery(`SELECT id FROM accounts WHERE ROWNUM <= 1`);
@@ -77,28 +59,15 @@ export async function createTransaction(payload: TransactionDTO) {
       }
     }
 
-    // 3. Simpan Transaksi
     const sql = `
       INSERT INTO transactions (
-        id,
-        user_id, 
-        account_id, 
-        type, 
-        amount, 
-        notes, 
-        transaction_date
+        id, user_id, account_id, type, amount, notes, transaction_date
       ) VALUES (
-        :id,
-        :userId, 
-        :accountId, 
-        :type, 
-        :amount, 
-        :notes, 
-        TO_DATE(:transactionDate, 'YYYY-MM-DD')
+        :id, :userId, :accountId, :type, :amount, :notes, TO_DATE(:transactionDate, 'YYYY-MM-DD')
       )
     `;
 
-    const binds = {
+    return await executeQuery(sql, {
       id: rawId,
       userId: validUserId,
       accountId: validAccountId,
@@ -106,54 +75,41 @@ export async function createTransaction(payload: TransactionDTO) {
       amount: Number(payload.amount),
       notes: notesContent,
       transactionDate: transactionDate,
-    };
-
-    return await executeQuery(sql, binds);
-
+    });
   } catch (err: any) {
     console.error('❌ CRITICAL TRANSACTION ERROR:', err?.message);
     throw new Error(err?.message || 'Gagal menyimpan transaksi ke Oracle DB');
   }
 }
 
-export async function getPaginatedTransactions(params: TransactionFilterParams) {
+export async function getPaginatedTransactions(params?: TransactionFilterParams) {
   try {
-    const page = Number(params.page) || 1;
-    const limit = Number(params.limit) || 20;
-    const startRow = (page - 1) * limit + 1;
-    const endRow = page * limit;
-
+    // Query polos tanpa bind parameter agar 100% aman dari ORA-00923
     const sql = `
-      SELECT * FROM (
-        SELECT res.*, ROWNUM rnum FROM (
-          SELECT 
-            t.id, 
-            t.type, 
-            t.amount, 
-            TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS transaction_date, 
-            t.notes,
-            t.user_id,
-            t.account_id
-          FROM transactions t
-          ORDER BY t.transaction_date DESC, t.id DESC
-        ) res WHERE ROWNUM <= :endRow
-      ) WHERE rnum >= :startRow
+      SELECT 
+        id, 
+        type, 
+        amount, 
+        TO_CHAR(transaction_date, 'YYYY-MM-DD') AS transaction_date, 
+        notes, 
+        user_id, 
+        account_id 
+      FROM transactions 
+      ORDER BY transaction_date DESC, id DESC
     `;
 
-    const result: any = await executeQuery(sql, { startRow, endRow });
+    const result: any = await executeQuery(sql);
     const rows = result?.rows || (Array.isArray(result) ? result : []);
 
-    // Mapping key uppercase dari Oracle ke lowercase yang dibutuhkan frontend
     return rows.map((row: any) => ({
-      id: row.ID ?? row.id,
-      type: row.TYPE ?? row.type ?? 'INCOME',
-      amount: Number(row.AMOUNT ?? row.amount ?? 0),
-      date: row.TRANSACTION_DATE ?? row.transaction_date,
-      title: row.NOTES ?? row.notes ?? 'Transaksi',
-      notes: row.NOTES ?? row.notes ?? '',
+      id: row.ID ?? row.id ?? row[0],
+      type: row.TYPE ?? row.type ?? row[1] ?? 'INCOME',
+      amount: Number(row.AMOUNT ?? row.amount ?? row[2] ?? 0),
+      date: row.TRANSACTION_DATE ?? row.transaction_date ?? row[3],
+      title: row.NOTES ?? row.notes ?? row[4] ?? 'Transaksi',
+      notes: row.NOTES ?? row.notes ?? row[4] ?? '',
       category: 'Umum'
     }));
-
   } catch (err: any) {
     console.error('❌ GET TRANSACTIONS ERROR:', err?.message);
     return [];
