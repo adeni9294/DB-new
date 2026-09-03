@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet, Edit2, Trash2, X, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
@@ -39,40 +39,45 @@ function KeuanganContent() {
   const [date, setDate] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 4000)
+    const timer = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Helper mendapatkan format tanggal lokal YYYY-MM-DD
+  const getTodayString = () => {
+    const today = new Date()
+    return today.toLocaleDateString('en-CA') // Format YYYY-MM-DD
   }
 
   // 1. Fetch Data dari Oracle DB
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch('/api/transactions')
+      const res = await fetch('/api/transactions', { signal })
 
       if (!res.ok) throw new Error(`API error: ${res.status}`)
 
       const data = await res.json()
       const transactionList = Array.isArray(data) ? data : (data.rows || [])
       setTransactions(transactionList)
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') return
       console.error('Gagal mengambil data transaksi:', err)
       setError('Gagal memuat data transaksi dari Oracle DB')
       setTransactions([])
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    fetchTransactions()
   }, [])
 
   useEffect(() => {
-    if (defaultAction === 'pemasukan') openAddModal('pemasukan')
-    else if (defaultAction === 'pengeluaran') openAddModal('pengeluaran')
-  }, [defaultAction])
+    const controller = new AbortController()
+    fetchTransactions(controller.signal)
+    return () => controller.abort()
+  }, [fetchTransactions])
 
   const isIncome = (typeStr: string) => {
     if (!typeStr) return false
@@ -80,16 +85,21 @@ function KeuanganContent() {
     return val === 'INCOME' || val === 'PEMASUKAN' || val === 'IN'
   }
 
-  const openAddModal = (type: 'pemasukan' | 'pengeluaran') => {
+  const openAddModal = useCallback((type: 'pemasukan' | 'pengeluaran') => {
     setEditingItem(null)
     setFormType(type)
     setTitle('')
     setAmount('')
     setCategory('')
-    setDate(new Date().toISOString().split('T')[0])
+    setDate(getTodayString())
     setError(null)
     setIsModalOpen(true)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (defaultAction === 'pemasukan') openAddModal('pemasukan')
+    else if (defaultAction === 'pengeluaran') openAddModal('pengeluaran')
+  }, [defaultAction, openAddModal])
 
   const openEditModal = (item: Transaction) => {
     setEditingItem(item)
@@ -97,7 +107,7 @@ function KeuanganContent() {
     setTitle(item.title || item.notes || '')
     setAmount(String(item.amount || 0))
     setCategory(item.category || 'Umum')
-    setDate(item.date || new Date().toISOString().split('T')[0])
+    setDate(item.date || getTodayString())
     setError(null)
     setIsModalOpen(true)
   }
@@ -115,13 +125,13 @@ function KeuanganContent() {
     setError(null)
 
     const payload = {
-      id: editingItem ? Number(editingItem.id) : undefined, // Pastikan ID dikirim sebagai angka
+      id: editingItem ? Number(editingItem.id) : undefined,
       title,
       notes: title,
       amount: parseFloat(amount),
       type: formType,
       category: category || 'Umum',
-      date: date || new Date().toISOString().split('T')[0],
+      date: date || getTodayString(),
     }
 
     try {
@@ -332,7 +342,7 @@ function KeuanganContent() {
                         </td>
                       </tr>
                     )
-                  })
+                   routine
                 )}
               </tbody>
             </table>
