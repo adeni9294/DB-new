@@ -4,17 +4,14 @@ import { NextResponse } from 'next/server';
 import { createTransaction } from '@/lib/oracle/repositories/transactionRepository';
 import { executeQuery } from '@/lib/oracle/pool';
 
-// Helper untuk mengekstrak teks asli jika nilainya berbentuk Objek dari Oracle
 function parseStringValue(val: any): string {
   if (val === null || val === undefined) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number') return String(val);
   if (typeof val === 'object') {
-    // Jika Oracle mengembalikan object { val: 'text' } atau sejenisnya
     if (val.val !== undefined) return String(val.val);
     if (val.value !== undefined) return String(val.value);
     if (val.text !== undefined) return String(val.text);
-    return JSON.stringify(val);
   }
   return String(val);
 }
@@ -34,6 +31,7 @@ export async function GET() {
     
     const result: any = await executeQuery(sql);
     
+    // Ambil baris data murni saja
     let rawRows: any[] = [];
     if (result && Array.isArray(result.rows)) {
       rawRows = result.rows;
@@ -41,7 +39,24 @@ export async function GET() {
       rawRows = result;
     }
 
-    const formattedData = rawRows.map((row: any) => {
+    // Bersihkan circular references dari setiap baris
+    const cleanRows = rawRows.map((row: any) => {
+      if (Array.isArray(row)) {
+        return row.map(item => (typeof item === 'object' ? parseStringValue(item) : item));
+      }
+      if (row && typeof row === 'object') {
+        const cleanObj: Record<string, any> = {};
+        for (const key of Object.keys(row)) {
+          const val = row[key];
+          cleanObj[key] = typeof val === 'object' ? parseStringValue(val) : val;
+        }
+        return cleanObj;
+      }
+      return row;
+    });
+
+    // Mapping ke format JSON murni
+    const formattedData = cleanRows.map((row: any) => {
       const rawId = row.ID ?? row.id ?? row[0];
       const rawNotes = row.NOTES ?? row.notes ?? row[1];
       const rawAmount = row.AMOUNT ?? row.amount ?? row[2];
