@@ -33,15 +33,22 @@ export interface TransactionDTO {
   accountId: string;
   type: string;
   category?: string;
-  description?: string;
+  category_id?: string;
+  notes?: string;       // Disesuaikan dengan nama kolom DB
+  title?: string;       // Tambahkan support untuk input 'title' dari frontend
+  description?: string; // Menyimpan fallback jika ada yang memanggil 'description'
+  date?: string;
   userId: string;
+  [key: string]: any;   // Mencegah error tipe di build Vercel
 }
 
 export async function createTransaction(data: TransactionDTO): Promise<string> {
   const transactionId = 'TRX-' + Date.now();
+  const notesContent = data.notes || data.title || data.description || '';
+
   const sql = `
-    INSERT INTO transactions (id, amount, account_id, type, category, description, user_id, created_at)
-    VALUES (:id, :amount, :accountId, :type, :category, :description, :userId, SYSDATE)
+    INSERT INTO transactions (id, amount, account_id, type, notes, user_id, transaction_date)
+    VALUES (:id, :amount, :accountId, :type, :notes, :userId, SYSDATE)
   `;
 
   await executeQuery(sql, {
@@ -49,8 +56,7 @@ export async function createTransaction(data: TransactionDTO): Promise<string> {
     amount: data.amount,
     accountId: data.accountId,
     type: data.type,
-    category: data.category || null,
-    description: data.description || null,
+    notes: notesContent,
     userId: data.userId,
   });
 
