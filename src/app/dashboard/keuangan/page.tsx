@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react'
+import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet, Edit2, Trash2, X } from 'lucide-react'
 
 type Transaction = {
   id: string | number
@@ -22,14 +22,18 @@ function KeuanganContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // State Modal Tambah / Edit
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<Transaction | null>(null)
+  
   const [formType, setFormType] = useState<'pemasukan' | 'pengeluaran'>('pemasukan')
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
+  const [date, setDate] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // 1. Fetch Data dari Oracle DB via API Route
+  // 1. Fetch Data dari Oracle DB
   const fetchTransactions = async () => {
     try {
       setLoading(true)
@@ -58,22 +62,43 @@ function KeuanganContent() {
 
   useEffect(() => {
     if (defaultAction === 'pemasukan') {
-      setFormType('pemasukan')
-      setIsModalOpen(true)
+      openAddModal('pemasukan')
     } else if (defaultAction === 'pengeluaran') {
-      setFormType('pengeluaran')
-      setIsModalOpen(true)
+      openAddModal('pengeluaran')
     }
   }, [defaultAction])
 
-  // Helper untuk mengecek apakah transaksi bertipe Pemasukan/Income
   const isIncome = (typeStr: string) => {
     if (!typeStr) return false
     const val = typeStr.toString().trim().toUpperCase()
     return val === 'INCOME' || val === 'PEMASUKAN' || val === 'IN'
   }
 
-  // 2. Submit Data Baru ke Oracle DB
+  // Buka modal untuk Tambah Data Baru
+  const openAddModal = (type: 'pemasukan' | 'pengeluaran') => {
+    setEditingItem(null)
+    setFormType(type)
+    setTitle('')
+    setAmount('')
+    setCategory('')
+    setDate(new Date().toISOString().split('T')[0])
+    setError(null)
+    setIsModalOpen(true)
+  }
+
+  // Buka modal untuk Edit Data
+  const openEditModal = (item: Transaction) => {
+    setEditingItem(item)
+    setFormType(isIncome(item.type) ? 'pemasukan' : 'pengeluaran')
+    setTitle(item.title || item.notes || '')
+    setAmount(String(item.amount || 0))
+    setCategory(item.category || 'Umum')
+    setDate(item.date || new Date().toISOString().split('T')[0])
+    setError(null)
+    setIsModalOpen(true)
+  }
+
+  // 2. Submit Data (Create & Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -83,19 +108,22 @@ function KeuanganContent() {
     }
 
     setIsSubmitting(true)
-    
+    setError(null)
+
     const payload = {
+      id: editingItem?.id,
       title,
       notes: title,
       amount: parseFloat(amount),
       type: formType,
       category: category || 'Umum',
-      date: new Date().toISOString().split('T')[0],
+      date: date || new Date().toISOString().split('T')[0],
     }
 
     try {
+      const isEdit = !!editingItem
       const res = await fetch('/api/transactions', {
-        method: 'POST',
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
@@ -106,11 +134,6 @@ function KeuanganContent() {
       }
 
       setIsModalOpen(false)
-      setTitle('')
-      setAmount('')
-      setCategory('')
-      setError(null)
-      
       await fetchTransactions()
     } catch (err: any) {
       console.error('❌ Gagal menyimpan transaksi:', err)
@@ -120,7 +143,27 @@ function KeuanganContent() {
     }
   }
 
-  // Kalkulasi total dengan pengecekan type yang fleksibel
+  // 3. Delete Transaksi
+  const handleDelete = async (id: string | number) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) return
+
+    try {
+      const res = await fetch(`/api/transactions?id=${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Gagal menghapus transaksi')
+      }
+
+      await fetchTransactions()
+    } catch (err: any) {
+      console.error('❌ Error DELETE transaction:', err)
+      alert(`Gagal menghapus: ${err.message}`)
+    }
+  }
+
   const totalPemasukan = transactions
     .filter(t => isIncome(t.type))
     .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
@@ -139,13 +182,13 @@ function KeuanganContent() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => { setFormType('pemasukan'); setIsModalOpen(true); setError(null); }}
+            onClick={() => openAddModal('pemasukan')}
             className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-all active:scale-95"
           >
             <PlusCircle className="w-4 h-4" /> + Pemasukan
           </button>
           <button
-            onClick={() => { setFormType('pengeluaran'); setIsModalOpen(true); setError(null); }}
+            onClick={() => openAddModal('pengeluaran')}
             className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-all active:scale-95"
           >
             <PlusCircle className="w-4 h-4" /> + Pengeluaran
@@ -202,12 +245,13 @@ function KeuanganContent() {
                   <th className="p-3">Kategori</th>
                   <th className="p-3">Jenis</th>
                   <th className="p-3 text-right">Jumlah</th>
+                  <th className="p-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-4 text-center text-slate-500">
+                    <td colSpan={6} className="p-4 text-center text-slate-500">
                       Belum ada data transaksi di Oracle DB.
                     </td>
                   </tr>
@@ -231,6 +275,24 @@ function KeuanganContent() {
                         <td className={`p-3 text-right font-bold ${income ? 'text-cyan-400' : 'text-rose-400'}`}>
                           {income ? '+' : '-'} Rp {Number(t.amount || 0).toLocaleString('id-ID')}
                         </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => openEditModal(t)}
+                              title="Edit Transaksi"
+                              className="p-1.5 bg-slate-800 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 border border-slate-700 hover:border-amber-500/30 rounded-lg transition-all"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(t.id)}
+                              title="Hapus Transaksi"
+                              className="p-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 rounded-lg transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     )
                   })
@@ -244,9 +306,17 @@ function KeuanganContent() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">
-              Tambah {formType === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} Baru
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-white">
+                {editingItem ? 'Edit Transaksi' : `Tambah ${formType === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} Baru`}
+              </h3>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {error && (
               <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs">
@@ -255,6 +325,18 @@ function KeuanganContent() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Jenis Transaksi</label>
+                <select
+                  value={formType}
+                  onChange={(e) => setFormType(e.target.value as 'pemasukan' | 'pengeluaran')}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="pemasukan">Pemasukan</option>
+                  <option value="pengeluaran">Pengeluaran</option>
+                </select>
+              </div>
+
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Judul Transaksi</label>
                 <input
@@ -282,6 +364,18 @@ function KeuanganContent() {
               </div>
 
               <div>
+                <label className="text-xs text-slate-400 block mb-1">Tanggal</label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                />
+              </div>
+
+              <div>
                 <label className="text-xs text-slate-400 block mb-1">Kategori</label>
                 <input
                   type="text"
@@ -296,10 +390,7 @@ function KeuanganContent() {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsModalOpen(false)
-                    setError(null)
-                  }}
+                  onClick={() => setIsModalOpen(false)}
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium disabled:opacity-50"
                 >
@@ -310,7 +401,7 @@ function KeuanganContent() {
                   disabled={isSubmitting}
                   className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isSubmitting ? '⏳ Menyimpan...' : 'Simpan Transaksi'}
+                  {isSubmitting ? '⏳ Menyimpan...' : editingItem ? 'Update Transaksi' : 'Simpan Transaksi'}
                 </button>
               </div>
             </form>
