@@ -13,6 +13,15 @@ export interface TransactionDTO {
   [key: string]: any;
 }
 
+export interface TransactionFilterParams {
+  userId?: string | number;
+  search?: string;
+  type?: string;
+  page?: number;
+  limit?: number;
+  [key: string]: any;
+}
+
 // Helper untuk normalisasi tipe transaksi sesuai CHECK CONSTRAINT database
 function normalizeTransactionType(rawType: string): 'INCOME' | 'EXPENSE' | 'TRANSFER' {
   if (!rawType) return 'INCOME';
@@ -93,7 +102,7 @@ export async function createTransaction(payload: TransactionDTO) {
       id: rawId,
       userId: validUserId,
       accountId: validAccountId,
-      type: validTransactionType, // Menggunakan type yang sudah lolos Check Constraint
+      type: validTransactionType,
       amount: Number(payload.amount),
       notes: notesContent,
       transactionDate: transactionDate,
@@ -104,5 +113,49 @@ export async function createTransaction(payload: TransactionDTO) {
   } catch (err: any) {
     console.error('❌ CRITICAL TRANSACTION ERROR:', err?.message);
     throw new Error(err?.message || 'Gagal menyimpan transaksi ke Oracle DB');
+  }
+}
+
+export async function getPaginatedTransactions(params: TransactionFilterParams) {
+  try {
+    const page = Number(params.page) || 1;
+    const limit = Number(params.limit) || 20;
+    const startRow = (page - 1) * limit + 1;
+    const endRow = page * limit;
+
+    const sql = `
+      SELECT * FROM (
+        SELECT res.*, ROWNUM rnum FROM (
+          SELECT 
+            t.id, 
+            t.type, 
+            t.amount, 
+            TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS transaction_date, 
+            t.notes,
+            t.user_id,
+            t.account_id
+          FROM transactions t
+          ORDER BY t.transaction_date DESC, t.id DESC
+        ) res WHERE ROWNUM <= :endRow
+      ) WHERE rnum >= :startRow
+    `;
+
+    const result: any = await executeQuery(sql, { startRow, endRow });
+    const rows = result?.rows || (Array.isArray(result) ? result : []);
+
+    // Mapping key uppercase dari Oracle ke lowercase yang dibutuhkan frontend
+    return rows.map((row: any) => ({
+      id: row.ID ?? row.id,
+      type: row.TYPE ?? row.type ?? 'INCOME',
+      amount: Number(row.AMOUNT ?? row.amount ?? 0),
+      date: row.TRANSACTION_DATE ?? row.transaction_date,
+      title: row.NOTES ?? row.notes ?? 'Transaksi',
+      notes: row.NOTES ?? row.notes ?? '',
+      category: 'Umum'
+    }));
+
+  } catch (err: any) {
+    console.error('❌ GET TRANSACTIONS ERROR:', err?.message);
+    return [];
   }
 }
