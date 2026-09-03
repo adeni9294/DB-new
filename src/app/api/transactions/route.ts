@@ -4,13 +4,11 @@ import { NextResponse } from 'next/server';
 import { createTransaction } from '@/lib/oracle/repositories/transactionRepository';
 import { executeQuery } from '@/lib/oracle/pool';
 
-// Helper Async untuk membaca data jika kolom bertipe Lob (CLOB) atau objek bertingkat
 async function extractString(val: any): Promise<string> {
   if (val === null || val === undefined) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number') return String(val);
 
-  // Jika Oracle mengembalikan Stream Lob / CLOB
   if (typeof val === 'object' && typeof val.read === 'function') {
     return new Promise((resolve) => {
       let data = '';
@@ -21,7 +19,6 @@ async function extractString(val: any): Promise<string> {
     });
   }
 
-  // Jika berupa object wrapper Oracle
   if (typeof val === 'object') {
     if (val.val !== undefined) return extractString(val.val);
     if (val.value !== undefined) return extractString(val.value);
@@ -68,17 +65,22 @@ export async function GET() {
         const typeText = await extractString(rawType);
         const dateText = await extractString(rawDate);
 
-        // Jika data di database memang terlanjur tersimpan tulisan "[object Object]"
         if (!notesText || notesText.trim() === '[object Object]') {
-          notesText = 'Transaksi Pemasukan';
+          notesText = 'Transaksi';
         }
+
+        // Mapping kembali nilai database yang singkat ke format UI
+        const cleanType = typeText.toLowerCase();
+        const displayType = (cleanType === 'out' || cleanType === 'expense' || cleanType === 'pengeluaran') 
+          ? 'pengeluaran' 
+          : 'pemasukan';
 
         return {
           id: idText,
           notes: notesText,
           title: notesText,
           amount: Number(amountText) || 0,
-          type: typeText.toLowerCase() || 'pemasukan',
+          type: displayType,
           category: 'Umum',
           date: dateText
         };
@@ -101,12 +103,12 @@ export async function POST(request: Request) {
 
     const { title, notes, amount, type, category, date, accountId } = body;
     
-    // Pastikan nilai notes murni berupa string primitif
     let transactionNotes = title || notes;
     if (typeof transactionNotes === 'object') {
       transactionNotes = JSON.stringify(transactionNotes);
     }
-    transactionNotes = String(transactionNotes || 'Transaksi');
+    // Batasi string notes jika ada constraint max length di DB
+    transactionNotes = String(transactionNotes || 'Transaksi').substring(0, 200);
 
     if (!amount || !type) {
       return NextResponse.json(
@@ -115,12 +117,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Dipersingkat ke 'IN' / 'OUT' atau 'in' / 'out' agar muat di kolom VARCHAR2 yang pendek
+    const rawType = String(type).trim().toLowerCase();
+    const dbType = (rawType === 'pengeluaran' || rawType === 'expense' || rawType === 'out') 
+      ? 'out' 
+      : 'in';
+
     const mockUserId = 'USER-001';
 
     const trxId = await createTransaction({
       notes: transactionNotes,
       amount: parseFloat(String(amount)),
-      type: String(type),
+      type: dbType, // Mengirim kode singkat ke Oracle DB
       category: category || 'Umum',
       date: date || new Date().toISOString().split('T')[0],
       userId: mockUserId,
@@ -136,11 +144,11 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('❌ POST /api/transactions error:', error?.message);
+    console.error('❌ POST /api/transactions error:', error);
     return NextResponse.json(
       { 
-        error: 'Gagal menyimpan transaksi ke Oracle DB', 
-        details: error?.message || 'Unknown error' 
+        error: error?.message || 'Gagal menyimpan transaksi ke Oracle DB', 
+        details: error?.stack || 'Unknown error' 
       }, 
       { status: 500 }
     );
