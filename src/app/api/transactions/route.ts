@@ -158,105 +158,84 @@ export async function POST(request: Request) {
   }
 }
 
-// --- PUT: EDIT / UPDATE TRANSAKSI ---
-export async function PUT(request: Request) {
+// 1. DELETE TRANSACTION
+export async function DELETE(request: Request) {
   try {
-    const body = await request.json();
-    const { id, title, notes, amount, type, date } = body;
+    const { searchParams } = new URL(request.url)
+    const idParam = searchParams.get('id')
 
-    const numericId = parseInt(String(id).replace(/\D/g, ''), 10);
-
-    if (!id || isNaN(numericId)) {
+    // Validasi ID wajib ada dan bernilai angka
+    if (!idParam || isNaN(Number(idParam))) {
       return NextResponse.json(
-        { error: 'ID transaksi wajib disertakan dan berupa angka valid.' },
+        { error: 'ID transaksi tidak valid atau kosong' },
         { status: 400 }
-      );
+      )
     }
 
-    let transactionNotes = title || notes;
-    if (typeof transactionNotes === 'object') {
-      transactionNotes = JSON.stringify(transactionNotes);
-    }
-    transactionNotes = String(transactionNotes || 'Transaksi').substring(0, 200);
+    const transactionId = Number(idParam)
 
-    const rawType = String(type).trim().toLowerCase();
-    const dbType = (rawType === 'pengeluaran' || rawType === 'expense' || rawType === 'out') 
-      ? 'out' 
-      : 'in';
+    // Eksekusi SQL dengan bind variable bertipe NUMBER
+    const result = await executeOracleQuery(
+      `DELETE FROM transactions WHERE id = :id`,
+      [transactionId]
+    )
 
-    const sql = `
-      UPDATE transactions 
-      SET 
-        notes = :notes,
-        amount = :amount,
-        type = :type,
-        transaction_date = TO_DATE(:trx_date, 'YYYY-MM-DD')
-      WHERE id = :id
-    `;
-
-    await executeQuery(sql, {
-      notes: transactionNotes,
-      amount: parseFloat(String(amount || 0)),
-      type: dbType,
-      trx_date: date || new Date().toISOString().split('T')[0],
-      id: numericId
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: 'Transaksi berhasil diperbarui di Oracle DB.'
-    });
+    return NextResponse.json({ success: true, result })
   } catch (error: any) {
-    console.error('❌ PUT /api/transactions error:', error);
+    console.error('❌ DELETE /api/transactions error:', error)
     return NextResponse.json(
-      { 
-        error: error?.message || 'Gagal memperbarui transaksi di Oracle DB', 
-        details: error?.stack || 'Unknown error' 
-      }, 
+      { error: error.message || 'Gagal menghapus data' },
       { status: 500 }
-    );
+    )
   }
 }
 
-// --- DELETE: HAPUS TRANSAKSI ---
-export async function DELETE(request: Request) {
+// 2. PUT TRANSACTION (EDIT)
+export async function PUT(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const rawId = searchParams.get('id');
+    const body = await request.json()
+    const { id, title, amount, type, category, date } = body
 
-    if (!rawId) {
+    if (!id || isNaN(Number(id))) {
       return NextResponse.json(
-        { error: 'ID transaksi wajib disertakan di query parameter (?id=...)' },
+        { error: 'ID transaksi tidak valid untuk pembaharuan data' },
         { status: 400 }
-      );
+      )
     }
 
-    // Hanya ambil karakter angka dari parameter id
-    const cleanIdStr = String(rawId).replace(/\D/g, '');
-    const numericId = parseInt(cleanIdStr, 10);
-
-    if (isNaN(numericId)) {
+    // Pastikan amount di-cast ke Number secara eksplisit
+    const numericAmount = Number(amount)
+    if (isNaN(numericAmount)) {
       return NextResponse.json(
-        { error: `ID transaksi (${rawId}) bukan merupakan angka yang valid.` },
+        { error: 'Jumlah (amount) harus berupa angka valid' },
         { status: 400 }
-      );
+      )
     }
 
-    const sql = `DELETE FROM transactions WHERE id = :id`;
-    await executeQuery(sql, { id: numericId });
+    const result = await executeOracleQuery(
+      `UPDATE transactions 
+       SET title = :title, 
+           amount = :amount, 
+           type = :type, 
+           category = :category, 
+           trans_date = TO_DATE(:trans_date, 'YYYY-MM-DD') 
+       WHERE id = :id`,
+      {
+        title: title || '',
+        amount: numericAmount,
+        type: type || 'pemasukan',
+        category: category || 'Umum',
+        trans_date: date,
+        id: Number(id)
+      }
+    )
 
-    return NextResponse.json({
-      success: true,
-      message: 'Transaksi berhasil dihapus dari Oracle DB.'
-    });
+    return NextResponse.json({ success: true, result })
   } catch (error: any) {
-    console.error('❌ DELETE /api/transactions error:', error);
+    console.error('❌ PUT /api/transactions error:', error)
     return NextResponse.json(
-      { 
-        error: error?.message || 'Gagal menghapus transaksi dari Oracle DB', 
-        details: error?.stack || 'Unknown error' 
-      }, 
+      { error: error.message || 'Gagal memperbarui data' },
       { status: 500 }
-    );
+    )
   }
 }
