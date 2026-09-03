@@ -19,24 +19,35 @@ export default function KeuanganPage() {
 
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formType, setFormType] = useState<'pemasukan' | 'pengeluaran'>('pemasukan')
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // 1. Fetch Data dari Oracle DB via API Route
   const fetchTransactions = async () => {
     try {
       setLoading(true)
+      setError(null)
       const res = await fetch('/api/transactions')
-      const data = await res.json()
-      if (Array.isArray(data)) {
-        setTransactions(data)
+      
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`)
       }
+      
+      const data = await res.json()
+      
+      // Handle both array response dan object response dengan rows property
+      const transactionList = Array.isArray(data) ? data : (data.rows || [])
+      setTransactions(transactionList)
     } catch (err) {
       console.error('Gagal mengambil data transaksi:', err)
+      setError('Gagal memuat data transaksi dari Oracle DB')
+      setTransactions([])
     } finally {
       setLoading(false)
     }
@@ -56,17 +67,26 @@ export default function KeuanganPage() {
     }
   }, [defaultAction])
 
-  // 2. Submit Data Baru ke Oracle DB
+  // 2. Submit Data Baru ke Oracle DB - PERBAIKAN: Align dengan API spec
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title || !amount) return
+    
+    if (!title || !amount) {
+      alert('Judul dan jumlah transaksi wajib diisi')
+      return
+    }
 
+    setIsSubmitting(true)
+    
+    // Payload yang sesuai dengan ekspektasi API
     const payload = {
       title,
       amount: parseFloat(amount),
       type: formType,
       category: category || 'Umum',
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      // Jika API juga butuh accountId, tambahkan di sini
+      // accountId: 'DEFAULT_ACCOUNT'
     }
 
     try {
@@ -76,15 +96,29 @@ export default function KeuanganPage() {
         body: JSON.stringify(payload)
       })
 
-      if (res.ok) {
-        setIsModalOpen(false)
-        setTitle('')
-        setAmount('')
-        setCategory('')
-        fetchTransactions() // Reload data dari Oracle
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || `API error: ${res.status}`)
       }
-    } catch (err) {
-      console.error('Gagal menyimpan transaksi:', err)
+
+      // SUCCESS: Reset form dan reload data
+      setIsModalOpen(false)
+      setTitle('')
+      setAmount('')
+      setCategory('')
+      setError(null)
+      
+      // Reload data dari Oracle
+      await fetchTransactions()
+      
+      // Optional: Show success message
+      console.log('✅ Transaksi berhasil disimpan ke Oracle DB')
+    } catch (err: any) {
+      console.error('❌ Gagal menyimpan transaksi:', err)
+      setError(err.message || 'Gagal menyimpan transaksi')
+      // Jangan tutup modal jika error, biar user bisa retry
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -106,14 +140,14 @@ export default function KeuanganPage() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => { setFormType('pemasukan'); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-all"
+            onClick={() => { setFormType('pemasukan'); setIsModalOpen(true); setError(null); }}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-all active:scale-95"
           >
             <PlusCircle className="w-4 h-4" /> + Pemasukan
           </button>
           <button
-            onClick={() => { setFormType('pengeluaran'); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-all"
+            onClick={() => { setFormType('pengeluaran'); setIsModalOpen(true); setError(null); }}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-all active:scale-95"
           >
             <PlusCircle className="w-4 h-4" /> + Pengeluaran
           </button>
@@ -150,6 +184,12 @@ export default function KeuanganPage() {
 
       <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md space-y-4">
         <h2 className="text-base font-bold text-white">Riwayat Transaksi</h2>
+
+        {error && (
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs">
+            ⚠️ {error}
+          </div>
+        )}
 
         {loading ? (
           <p className="text-xs text-slate-400">Memuat data dari database Oracle...</p>
@@ -206,6 +246,12 @@ export default function KeuanganPage() {
               Tambah {formType === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} Baru
             </h3>
 
+            {error && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs">
+                ⚠️ {error}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Judul Transaksi</label>
@@ -215,7 +261,8 @@ export default function KeuanganPage() {
                   placeholder="Contoh: Honorarium / Pembelian Alat"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                 />
               </div>
 
@@ -227,7 +274,8 @@ export default function KeuanganPage() {
                   placeholder="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                 />
               </div>
 
@@ -238,23 +286,29 @@ export default function KeuanganPage() {
                   placeholder="Contoh: Operasional, Gaji, Event"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium"
+                  onClick={() => {
+                    setIsModalOpen(false)
+                    setError(null)
+                  }}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs disabled:opacity-50 flex items-center gap-2"
                 >
-                  Simpan Transaksi
+                  {isSubmitting ? '⏳ Menyimpan...' : 'Simpan Transaksi'}
                 </button>
               </div>
             </form>
