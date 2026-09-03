@@ -6,8 +6,6 @@ import { executeQuery } from '@/lib/oracle/pool';
 
 export async function GET() {
   try {
-    // 1. Mengubah alias "date" menjadi "trx_date" untuk menghindari Oracle Reserved Keyword (ORA-00923)
-    // 2. Menghapus kolom 'category' dari SQL jika tidak ada di tabel transactions
     const sql = `
       SELECT 
         id, 
@@ -20,24 +18,39 @@ export async function GET() {
     `;
     
     const result: any = await executeQuery(sql);
-    const rawRows = result?.rows || (Array.isArray(result) ? result : []);
+    
+    // Ekstrak baris data secara aman dari objek/array Oracle
+    let rawRows: any[] = [];
+    if (result && Array.isArray(result.rows)) {
+      rawRows = result.rows;
+    } else if (Array.isArray(result)) {
+      rawRows = result;
+    }
 
-    // Format properti objek agar seragam dan aman dikonsumsi Frontend Next.js
-    const formattedData = rawRows.map((row: any) => ({
-      id: row.ID ?? row.id ?? row[0],
-      notes: row.NOTES ?? row.notes ?? row[1] ?? '',
-      title: row.NOTES ?? row.notes ?? row[1] ?? 'Transaksi',
-      amount: Number(row.AMOUNT ?? row.amount ?? row[2] ?? 0),
-      type: (row.TYPE ?? row.type ?? row[3] ?? 'INCOME').toString().toLowerCase(),
-      category: 'Umum',
-      date: row.TRX_DATE ?? row.trx_date ?? row[4] ?? ''
-    }));
+    // Ubah data ke objek JavaScript polos (bebas circular reference)
+    const formattedData = rawRows.map((row: any) => {
+      const id = row.ID ?? row.id ?? row[0] ?? '';
+      const notes = row.NOTES ?? row.notes ?? row[1] ?? '';
+      const amount = Number(row.AMOUNT ?? row.amount ?? row[2] ?? 0);
+      const rawType = (row.TYPE ?? row.type ?? row[3] ?? 'INCOME').toString();
+      const date = row.TRX_DATE ?? row.trx_date ?? row[4] ?? '';
+
+      return {
+        id: String(id),
+        notes: String(notes),
+        title: String(notes) || 'Transaksi',
+        amount: isNaN(amount) ? 0 : amount,
+        type: rawType.toLowerCase(),
+        category: 'Umum',
+        date: String(date)
+      };
+    });
 
     return NextResponse.json(formattedData);
   } catch (error: any) {
-    console.error('❌ GET /api/transactions error:', error);
+    console.error('❌ GET /api/transactions error:', error?.message);
     return NextResponse.json(
-      { error: 'Gagal mengambil data transaksi dari Oracle DB', details: error.message }, 
+      { error: 'Gagal mengambil data transaksi dari Oracle DB', details: error?.message || 'Unknown error' }, 
       { status: 500 }
     );
   }
@@ -85,11 +98,11 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('❌ POST /api/transactions error:', error);
+    console.error('❌ POST /api/transactions error:', error?.message);
     return NextResponse.json(
       { 
         error: 'Gagal menyimpan transaksi ke Oracle DB', 
-        details: error.message 
+        details: error?.message || 'Unknown error' 
       }, 
       { status: 500 }
     );
