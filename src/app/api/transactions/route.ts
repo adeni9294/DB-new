@@ -193,13 +193,18 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { id, title, notes, amount, type, date } = body;
 
-    if (!id || isNaN(Number(id))) {
+    // 1. Ekstrak & bersihkan ID agar murni berupa angka (NUMBER)
+    const cleanId = String(id || '').replace(/\D/g, '');
+    const numericId = parseInt(cleanId, 10);
+
+    if (!cleanId || isNaN(numericId)) {
       return NextResponse.json(
         { error: 'ID transaksi tidak valid untuk pembaharuan data' },
         { status: 400 }
       );
     }
 
+    // 2. Pastikan amount berupa angka (NUMBER)
     const numericAmount = Number(amount);
     if (isNaN(numericAmount)) {
       return NextResponse.json(
@@ -208,6 +213,7 @@ export async function PUT(request: Request) {
       );
     }
 
+    // 3. Normalize type
     const rawType = String(type || '').trim().toLowerCase();
     const dbType = (rawType === 'pengeluaran' || rawType === 'expense' || rawType === 'out') 
       ? 'out' 
@@ -215,27 +221,34 @@ export async function PUT(request: Request) {
 
     const transactionNotes = String(title || notes || 'Transaksi').substring(0, 200);
 
-    const result = await executeQuery(
-      `UPDATE transactions 
-       SET notes = :notes, 
-           amount = :amount, 
-           type = :type, 
-           transaction_date = TO_DATE(:trx_date, 'YYYY-MM-DD') 
-       WHERE id = :id`,
-      {
-        notes: transactionNotes,
-        amount: numericAmount,
-        type: dbType,
-        trx_date: date || new Date().toISOString().split('T')[0],
-        id: Number(id)
-      }
-    );
+    // 4. Pastikan tanggal dikirim dengan format YYYY-MM-DD
+    const formattedDate = date ? String(date).trim() : new Date().toISOString().split('T')[0];
+
+    // Query UPDATE dengan TO_DATE untuk menghindari mismatch tanggal & tipe data
+    const sql = `
+      UPDATE transactions 
+      SET notes = :notes, 
+          amount = :amount, 
+          type = :type, 
+          transaction_date = TO_DATE(:trx_date, 'YYYY-MM-DD') 
+      WHERE id = :id
+    `;
+
+    const bindParams = {
+      notes: transactionNotes,
+      amount: numericAmount,
+      type: dbType,
+      trx_date: formattedDate,
+      id: numericId
+    };
+
+    const result = await executeQuery(sql, bindParams);
 
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
     console.error('❌ PUT /api/transactions error:', error);
     return NextResponse.json(
-      { error: error.message || 'Gagal memperbarui data' },
+      { error: error.message || 'Gagal memperbarui data', details: error?.stack },
       { status: 500 }
     );
   }
