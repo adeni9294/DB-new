@@ -32,32 +32,41 @@ export interface TransactionFilterParams {
 
 export async function createTransaction(payload: TransactionDTO) {
   try {
-    // Gunakan ID berupa angka unik agar aman untuk kolom ID ber-tipe NUMBER/VARCHAR
     const rawId = Date.now(); 
     const notesContent = payload.notes || payload.title || '';
     const transactionDate = payload.date || new Date().toISOString().split('T')[0];
 
-    // Coba ambil user_id valid dari tabel users jika tidak disediakan
+    // 1. Gunakan ROWNUM <= 1 (sintaks kompatibel Oracle DB) untuk mengambil USER_ID valid
     let activeUserId: any = payload.userId;
     if (!activeUserId) {
-      const userRes: any = await executeQuery(`SELECT id FROM users FETCH FIRST 1 ROWS ONLY`);
-      if (userRes?.rows?.[0]) {
-        activeUserId = userRes.rows[0].ID ?? userRes.rows[0].id;
-      } else {
+      try {
+        const userRes: any = await executeQuery(`SELECT id FROM users WHERE ROWNUM <= 1`);
+        if (userRes?.rows?.[0]) {
+          activeUserId = userRes.rows[0].ID ?? userRes.rows[0].id ?? 1;
+        } else {
+          activeUserId = 1;
+        }
+      } catch {
         activeUserId = 1;
       }
     }
 
-    // Coba ambil account_id valid dari tabel accounts jika tidak disediakan
+    // 2. Ambil ACCOUNT_ID valid dari tabel ACCOUNTS
     let activeAccountId: any = payload.accountId;
     if (!activeAccountId || activeAccountId === 'DEFAULT_ACCOUNT') {
-      const accRes: any = await executeQuery(`SELECT id FROM accounts FETCH FIRST 1 ROWS ONLY`);
-      if (accRes?.rows?.[0]) {
-        activeAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
-      } else {
-        activeAccountId = null;
+      try {
+        const accRes: any = await executeQuery(`SELECT id FROM accounts WHERE ROWNUM <= 1`);
+        if (accRes?.rows?.[0]) {
+          activeAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
+        }
+      } catch {
+        // jika gagal, tetap lanjut ke fallback
       }
     }
+
+    // 3. Pastikan tidak ada nilai null pada kolom ber-constraint NOT NULL
+    const finalUserId = activeUserId ?? 1;
+    const finalAccountId = activeAccountId ?? 1; // Menggunakan ID account 1 sebagai fallback wajib
 
     const sql = `
       INSERT INTO transactions (
@@ -81,39 +90,31 @@ export async function createTransaction(payload: TransactionDTO) {
 
     const binds = {
       id: rawId,
-      userId: activeUserId,
-      accountId: activeAccountId,
+      userId: finalUserId,
+      accountId: finalAccountId,
       type: payload.type || 'INCOME',
       amount: Number(payload.amount),
       notes: notesContent,
       transactionDate: transactionDate,
     };
 
-    console.log('📌 Executing Transaction Binds:', binds);
     const result = await executeQuery(sql, binds);
     return result;
 
   } catch (err: any) {
-    // Log detail error Oracle DB ke Vercel Runtime Logs / Terminal
-    console.error('❌ CRITICAL ORACLE DB ERROR:', {
-      message: err?.message,
-      code: err?.code,
-      stack: err?.stack,
-      oracleErrorNumber: err?.errorNum
-    });
-    
-    // Throw error kembali agar API Route mengirim pesan detailnya ke Frontend
+    console.error('❌ CRITICAL ORACLE DB ERROR:', err?.message);
     throw new Error(err?.message || 'Gagal menyimpan transaksi ke Oracle DB');
   }
 }
 
 export async function getPaginatedTransactions(params: TransactionFilterParams) {
-  const page = params.page || 1;
-  const limit = params.limit || 10;
-  const offset = (page - 1) * limit;
+  const page = Number(params.page) || 1;
+  const limit = Number(params.limit) || 10;
+  const startRow = (page - 1) * limit + 1;
+  const endRow = page * limit;
 
   let whereClauses = ['t.user_id = :userId'];
-  let binds: Record<string, any> = { userId: params.userId };
+  let binds: Record<string, any> = { userId: params.userId || 1 };
 
   if (params.search) {
     whereClauses.push('(LOWER(t.notes) LIKE :search OR LOWER(c.name) LIKE :search)');
@@ -147,23 +148,28 @@ export async function getPaginatedTransactions(params: TransactionFilterParams) 
 
   const whereSql = whereClauses.join(' AND ');
 
+  // Menggunakan ROWNUM pagination agar kompatibel dengan semua versi Oracle DB
   const sql = `
-    SELECT 
-      t.id, t.type, t.amount, t.transaction_date, t.notes,
-      a.name AS account_name,
-      to_a.name AS to_account_name,
-      c.name AS category_name,
-      o.name AS organization_name,
-      e.title AS event_title
-    FROM transactions t
-    LEFT JOIN accounts a ON t.account_id = a.id
-    LEFT JOIN accounts to_a ON t.to_account_id = to_a.id
-    LEFT JOIN categories c ON t.category_id = c.id
-    LEFT JOIN organizations o ON t.organization_id = o.id
-    LEFT JOIN events e ON t.event_id = e.id
-    WHERE ${whereSql}
-    ORDER BY t.transaction_date DESC
-    OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
+    SELECT * FROM (
+      SELECT inner_query.*, ROWNUM rnum FROM (
+        SELECT 
+          t.id, t.type, t.amount, t.transaction_date, t.notes,
+          a.name AS account_name,
+          to_a.name AS to_account_name,
+          c.name AS category_name,
+          o.name AS organization_name,
+          e.title AS event_title
+        FROM transactions t
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN accounts to_a ON t.to_account_id = to_a.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN organizations o ON t.organization_id = o.id
+        LEFT JOIN events e ON t.event_id = e.id
+        WHERE ${whereSql}
+        ORDER BY t.transaction_date DESC
+      ) inner_query
+      WHERE ROWNUM <= ${endRow}
+    ) WHERE rnum >= ${startRow}
   `;
 
   const rows = await executeQuery(sql, binds);
