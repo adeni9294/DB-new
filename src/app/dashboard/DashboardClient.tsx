@@ -36,15 +36,25 @@ interface JadwalSholatAladhan {
   ReadableDate: string;
 }
 
+interface KasSummaryType {
+  totalSaldo: number;
+  pemasukanBulanIni: number;
+  pengeluaranBulanIni: number;
+  loading: boolean;
+  error: string | null;
+}
+
 export default function DashboardClient({ user }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<"transparansi" | "yasin" | "sholat" | "haul">("transparansi");
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
 
-  // State Data - Transparansi Kas
-  const [kasSummary] = useState({
-    saldo: 12500000,
-    pemasukan: 3200000,
-    pengeluaran: 1100000
+  // State Data - Transparansi Kas (REAL DATA dari Oracle DB)
+  const [kasSummary, setKasSummary] = useState<KasSummaryType>({
+    totalSaldo: 0,
+    pemasukanBulanIni: 0,
+    pengeluaranBulanIni: 0,
+    loading: true,
+    error: null
   });
 
   // State Real API - Yasin
@@ -63,6 +73,35 @@ export default function DashboardClient({ user }: DashboardClientProps) {
   // State Kompas Kiblat Real Sensor
   const [heading, setHeading] = useState<number | null>(null);
   const [kompasActive, setKompasActive] = useState<boolean>(false);
+
+  // PERBAIKAN: Fetch Real Data Kas Summary dari Oracle DB via API
+  const fetchKasSummary = useCallback(async () => {
+    setKasSummary(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const res = await fetch('/api/dashboard/summary');
+      
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      setKasSummary({
+        totalSaldo: data.totalSaldo || 0,
+        pemasukanBulanIni: data.pemasukanBulanIni || 0,
+        pengeluaranBulanIni: data.pengeluaranBulanIni || 0,
+        loading: false,
+        error: null
+      });
+    } catch (err: any) {
+      console.error('❌ Gagal mengambil kas summary:', err);
+      setKasSummary(prev => ({
+        ...prev,
+        loading: false,
+        error: err.message || 'Gagal memuat data kas'
+      }));
+    }
+  }, []);
 
   // 1. Fetch Real Data Surah Yasin (Surah No. 36)
   const fetchYasin = useCallback(async () => {
@@ -122,13 +161,16 @@ export default function DashboardClient({ user }: DashboardClientProps) {
   }, []);
 
   useEffect(() => {
+    // Fetch Kas Summary saat component mount
+    fetchKasSummary();
+    
     if (activeTab === "yasin" && yasinAyahs.length === 0) {
       fetchYasin();
     }
     if (activeTab === "sholat") {
       fetchJadwalAladhan(selectedCity);
     }
-  }, [activeTab, fetchYasin, fetchJadwalAladhan, selectedCity, yasinAyahs.length]);
+  }, [activeTab, fetchYasin, fetchJadwalAladhan, fetchKasSummary, selectedCity, yasinAyahs.length]);
 
   const handleCitySearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,53 +290,74 @@ export default function DashboardClient({ user }: DashboardClientProps) {
         {/* TAB 1: TRANSPARANSI KAS */}
         {activeTab === "transparansi" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
-                <div className="flex justify-between items-center text-slate-400 mb-2">
-                  <span className="text-sm font-medium">Sisa Kas Utama</span>
-                  <Wallet size={20} className="text-emerald-400" />
-                </div>
-                <p className="text-3xl font-bold text-white">
-                  Rp {kasSummary.saldo.toLocaleString("id-ID")}
-                </p>
-                <span className="text-xs text-emerald-400 mt-2 inline-block">Terverifikasi Pengurus</span>
+            {kasSummary.loading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="animate-spin text-emerald-500" size={32} />
               </div>
+            ) : kasSummary.error ? (
+              <div className="p-4 bg-rose-950/40 border border-rose-800 text-rose-300 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={20} />
+                  <span className="text-sm">{kasSummary.error}</span>
+                </div>
+                <button 
+                  onClick={fetchKasSummary} 
+                  className="p-2 bg-rose-800 rounded-lg hover:bg-rose-700 transition"
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                    <div className="flex justify-between items-center text-slate-400 mb-2">
+                      <span className="text-sm font-medium">Sisa Kas Utama</span>
+                      <Wallet size={20} className="text-emerald-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-white">
+                      Rp {kasSummary.totalSaldo.toLocaleString("id-ID")}
+                    </p>
+                    <span className="text-xs text-emerald-400 mt-2 inline-block">Terverifikasi Oracle DB</span>
+                  </div>
 
-              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
-                <div className="flex justify-between items-center text-slate-400 mb-2">
-                  <span className="text-sm font-medium">Pemasukan Bulan Ini</span>
-                  <ArrowUpRight size={20} className="text-emerald-400" />
-                </div>
-                <p className="text-3xl font-bold text-emerald-400">
-                  + Rp {kasSummary.pemasukan.toLocaleString("id-ID")}
-                </p>
-                <span className="text-xs text-slate-500 mt-2 inline-block">Iuran & Donatur</span>
-              </div>
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                    <div className="flex justify-between items-center text-slate-400 mb-2">
+                      <span className="text-sm font-medium">Pemasukan Bulan Ini</span>
+                      <ArrowUpRight size={20} className="text-emerald-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-emerald-400">
+                      + Rp {kasSummary.pemasukanBulanIni.toLocaleString("id-ID")}
+                    </p>
+                    <span className="text-xs text-slate-500 mt-2 inline-block">Total Kas Masuk</span>
+                  </div>
 
-              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
-                <div className="flex justify-between items-center text-slate-400 mb-2">
-                  <span className="text-sm font-medium">Pengeluaran Bulan Ini</span>
-                  <ArrowDownRight size={20} className="text-rose-400" />
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                    <div className="flex justify-between items-center text-slate-400 mb-2">
+                      <span className="text-sm font-medium">Pengeluaran Bulan Ini</span>
+                      <ArrowDownRight size={20} className="text-rose-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-rose-400">
+                      - Rp {kasSummary.pengeluaranBulanIni.toLocaleString("id-ID")}
+                    </p>
+                    <span className="text-xs text-slate-500 mt-2 inline-block">Total Kas Keluar</span>
+                  </div>
                 </div>
-                <p className="text-3xl font-bold text-rose-400">
-                  - Rp {kasSummary.pengeluaran.toLocaleString("id-ID")}
-                </p>
-                <span className="text-xs text-slate-500 mt-2 inline-block">Operasional & Kegiatan</span>
-              </div>
-            </div>
 
-            <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Calendar className="text-emerald-400" size={20} /> Agenda Kegiatan Terdekat
-              </h3>
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div>
-                  <h4 className="font-semibold text-white">Yasinan & Tahlil Malam Jumat</h4>
-                  <p className="text-xs text-slate-400">Setiap Kamis Malam • Ba'da Isya</p>
+                <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Calendar className="text-emerald-400" size={20} /> Agenda Kegiatan Terdekat
+                  </h3>
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <h4 className="font-semibold text-white">Yasinan & Tahlil Malam Jumat</h4>
+                      <p className="text-xs text-slate-400">Setiap Kamis Malam • Ba'da Isya</p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Rutin</span>
+                  </div>
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Rutin</span>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
 
