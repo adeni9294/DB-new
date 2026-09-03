@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet, Edit2, Trash2, X } from 'lucide-react'
+import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet, Edit2, Trash2, X, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 type Transaction = {
   id: string | number
@@ -22,10 +22,16 @@ function KeuanganContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // State Modal Tambah / Edit
+  // State Modal Form Tambah / Edit
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<Transaction | null>(null)
-  
+
+  // State Custom Confirm Delete Modal
+  const [deleteTargetId, setDeleteTargetId] = useState<string | number | null>(null)
+
+  // State Toast Notification Modern
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
   const [formType, setFormType] = useState<'pemasukan' | 'pengeluaran'>('pemasukan')
   const [title, setTitle] = useState('')
   const [amount, setAmount] = useState('')
@@ -33,17 +39,20 @@ function KeuanganContent() {
   const [date, setDate] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 4000)
+  }
+
   // 1. Fetch Data dari Oracle DB
   const fetchTransactions = async () => {
     try {
       setLoading(true)
       setError(null)
       const res = await fetch('/api/transactions')
-      
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`)
-      }
-      
+
+      if (!res.ok) throw new Error(`API error: ${res.status}`)
+
       const data = await res.json()
       const transactionList = Array.isArray(data) ? data : (data.rows || [])
       setTransactions(transactionList)
@@ -61,11 +70,8 @@ function KeuanganContent() {
   }, [])
 
   useEffect(() => {
-    if (defaultAction === 'pemasukan') {
-      openAddModal('pemasukan')
-    } else if (defaultAction === 'pengeluaran') {
-      openAddModal('pengeluaran')
-    }
+    if (defaultAction === 'pemasukan') openAddModal('pemasukan')
+    else if (defaultAction === 'pengeluaran') openAddModal('pengeluaran')
   }, [defaultAction])
 
   const isIncome = (typeStr: string) => {
@@ -74,7 +80,6 @@ function KeuanganContent() {
     return val === 'INCOME' || val === 'PEMASUKAN' || val === 'IN'
   }
 
-  // Buka modal untuk Tambah Data Baru
   const openAddModal = (type: 'pemasukan' | 'pengeluaran') => {
     setEditingItem(null)
     setFormType(type)
@@ -86,7 +91,6 @@ function KeuanganContent() {
     setIsModalOpen(true)
   }
 
-  // Buka modal untuk Edit Data
   const openEditModal = (item: Transaction) => {
     setEditingItem(item)
     setFormType(isIncome(item.type) ? 'pemasukan' : 'pengeluaran')
@@ -101,9 +105,9 @@ function KeuanganContent() {
   // 2. Submit Data (Create & Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!title || !amount) {
-      alert('Judul dan jumlah transaksi wajib diisi')
+      setError('Judul dan jumlah transaksi wajib diisi.')
       return
     }
 
@@ -111,7 +115,7 @@ function KeuanganContent() {
     setError(null)
 
     const payload = {
-      id: editingItem?.id,
+      id: editingItem ? Number(editingItem.id) : undefined, // Pastikan ID dikirim sebagai angka
       title,
       notes: title,
       amount: parseFloat(amount),
@@ -128,39 +132,53 @@ function KeuanganContent() {
         body: JSON.stringify(payload)
       })
 
+      const resData = await res.json()
+
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || `API error: ${res.status}`)
+        throw new Error(resData.error || resData.details || `API Error: ${res.status}`)
       }
 
       setIsModalOpen(false)
+      showToast(isEdit ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil ditambahkan', 'success')
       await fetchTransactions()
     } catch (err: any) {
       console.error('❌ Gagal menyimpan transaksi:', err)
       setError(err.message || 'Gagal menyimpan transaksi')
+      showToast(err.message || 'Gagal menyimpan transaksi', 'error')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   // 3. Delete Transaksi
-  const handleDelete = async (id: string | number) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) return
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return
+
+    const numericId = Number(deleteTargetId)
+    if (isNaN(numericId)) {
+      showToast('ID transaksi tidak valid (Bukan angka)', 'error')
+      setDeleteTargetId(null)
+      return
+    }
 
     try {
-      const res = await fetch(`/api/transactions?id=${id}`, {
+      const res = await fetch(`/api/transactions?id=${numericId}`, {
         method: 'DELETE',
       })
 
+      const data = await res.json()
+
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Gagal menghapus transaksi')
+        throw new Error(data.error || data.details || 'Gagal menghapus transaksi')
       }
 
+      showToast('Transaksi berhasil dihapus', 'success')
+      setDeleteTargetId(null)
       await fetchTransactions()
     } catch (err: any) {
       console.error('❌ Error DELETE transaction:', err)
-      alert(`Gagal menghapus: ${err.message}`)
+      showToast(err.message || 'Gagal menghapus transaksi', 'error')
+      setDeleteTargetId(null)
     }
   }
 
@@ -173,7 +191,24 @@ function KeuanganContent() {
     .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-slate-100">
+    <div className="space-y-6 max-w-7xl mx-auto text-slate-100 relative">
+      
+      {/* --- TOAST NOTIFICATION MODERN --- */}
+      {toast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl transition-all animate-bounce ${
+          toast.type === 'success' 
+            ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300' 
+            : 'bg-rose-950/80 border-rose-500/40 text-rose-300'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <AlertTriangle className="w-5 h-5 text-rose-400" />}
+          <span className="text-xs font-medium">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-slate-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* --- HEADER --- */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Manajemen Keuangan</h1>
@@ -196,6 +231,7 @@ function KeuanganContent() {
         </div>
       </div>
 
+      {/* --- CARD RINGKASAN --- */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5">
           <div className="flex items-center justify-between text-slate-400 text-xs">
@@ -224,12 +260,13 @@ function KeuanganContent() {
         </div>
       </div>
 
+      {/* --- TABEL RIWAYAT TRANSAKSI --- */}
       <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md space-y-4">
         <h2 className="text-base font-bold text-white">Riwayat Transaksi</h2>
 
         {error && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs">
-            ⚠️ {error}
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" /> {error}
           </div>
         )}
 
@@ -285,7 +322,7 @@ function KeuanganContent() {
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDelete(t.id)}
+                              onClick={() => setDeleteTargetId(t.id)}
                               title="Hapus Transaksi"
                               className="p-1.5 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/30 rounded-lg transition-all"
                             >
@@ -303,6 +340,7 @@ function KeuanganContent() {
         )}
       </div>
 
+      {/* --- MODAL FORM TAMBAH / EDIT --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
@@ -310,17 +348,14 @@ function KeuanganContent() {
               <h3 className="text-lg font-bold text-white">
                 {editingItem ? 'Edit Transaksi' : `Tambah ${formType === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'} Baru`}
               </h3>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
-              >
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {error && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs">
-                ⚠️ {error}
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
               </div>
             )}
 
@@ -408,6 +443,38 @@ function KeuanganContent() {
           </div>
         </div>
       )}
+
+      {/* --- MODERN CONFIRMATION MODAL DELETE --- */}
+      {deleteTargetId !== null && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Konfirmasi Hapus</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Apakah Anda yakin ingin menghapus transaksi ini? Data di database Oracle akan dihapus secara permanen.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setDeleteTargetId(null)}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
