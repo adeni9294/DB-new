@@ -18,7 +18,14 @@ async function withTimeout<T>(p: Promise<T>, ms: number) {
 export async function POST(req: Request) {
   const reqId = Date.now()
   try {
-    const body = await req.json()
+    let body: any = {}
+    try {
+      body = await req.json()
+    } catch (parseErr) {
+      console.error(`[login:${reqId}] Failed to parse request body`, parseErr)
+      return NextResponse.json({ error: 'Request body tidak valid' }, { status: 400 })
+    }
+
     const email = body?.email
     // do not log passwords
     console.log(`[login:${reqId}] start`, { email })

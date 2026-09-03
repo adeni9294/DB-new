@@ -23,7 +23,15 @@ export default function RegisterPage() {
         body: JSON.stringify({ name, email, password })
       })
 
-      const data = await res.json()
+      let data: any = null
+      try {
+        data = await res.json()
+      } catch (err) {
+        console.error('Failed to parse JSON from /api/auth/register', err)
+        setError('Server response tidak valid')
+        setLoading(false)
+        return
+      }
       
       if (res.ok) {
         router.push('/login') // abis daftar langsung ke login
@@ -60,7 +68,8 @@ export default function RegisterPage() {
               placeholder="John Doe" 
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
               required 
             />
           </div>
@@ -72,7 +81,8 @@ export default function RegisterPage() {
               placeholder="nama@email.com" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
               required 
             />
           </div>
@@ -84,7 +94,8 @@ export default function RegisterPage() {
               placeholder="Minimal 6 karakter" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
               required 
               minLength={6}
             />

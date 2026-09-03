@@ -31,6 +31,9 @@ export default function LoginPage() {
         data = await res.json()
       } catch (err) {
         console.error('Failed to parse JSON from /api/auth/login', err)
+        setError('Server response tidak valid')
+        setLoading(false)
+        return
       }
 
       if (res.ok) {
@@ -38,6 +41,7 @@ export default function LoginPage() {
         window.location.href = '/dashboard'
       } else {
         setError((data && data.error) || 'Login gagal')
+        setLoading(false)
       }
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -46,9 +50,9 @@ export default function LoginPage() {
         console.error('Login request error:', err)
         setError('Gagal konek ke server')
       }
+      setLoading(false)
     } finally {
       clearTimeout(timeout)
-      setLoading(false)
     }
   }
 
@@ -75,7 +79,8 @@ export default function LoginPage() {
               placeholder="nama@email.com" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
               required 
             />
           </div>
@@ -87,7 +92,8 @@ export default function LoginPage() {
               placeholder="••••" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800"
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
               required 
             />
           </div>
