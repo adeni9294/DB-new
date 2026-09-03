@@ -66,7 +66,6 @@ export async function GET() {
         const typeText = await extractString(rawType);
         const dateText = await extractString(rawDate);
 
-        // Bersihkan ID dari karakter non-angka
         const cleanIdStr = idText.replace(/\D/g, '');
         const parsedId = parseInt(cleanIdStr, 10);
         const finalId = isNaN(parsedId) ? idText : parsedId;
@@ -158,84 +157,86 @@ export async function POST(request: Request) {
   }
 }
 
-// 1. DELETE TRANSACTION
+// --- DELETE: HAPUS TRANSAKSI ---
 export async function DELETE(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const idParam = searchParams.get('id')
+    const { searchParams } = new URL(request.url);
+    const idParam = searchParams.get('id');
 
-    // Validasi ID wajib ada dan bernilai angka
     if (!idParam || isNaN(Number(idParam))) {
       return NextResponse.json(
         { error: 'ID transaksi tidak valid atau kosong' },
         { status: 400 }
-      )
+      );
     }
 
-    const transactionId = Number(idParam)
+    const transactionId = Number(idParam);
 
-    // Eksekusi SQL dengan bind variable bertipe NUMBER
-    const result = await executeOracleQuery(
+    const result = await executeQuery(
       `DELETE FROM transactions WHERE id = :id`,
       [transactionId]
-    )
+    );
 
-    return NextResponse.json({ success: true, result })
+    return NextResponse.json({ success: true, result });
   } catch (error: any) {
-    console.error('❌ DELETE /api/transactions error:', error)
+    console.error('❌ DELETE /api/transactions error:', error);
     return NextResponse.json(
       { error: error.message || 'Gagal menghapus data' },
       { status: 500 }
-    )
+    );
   }
 }
 
-// 2. PUT TRANSACTION (EDIT)
+// --- PUT: EDIT TRANSAKSI ---
 export async function PUT(request: Request) {
   try {
-    const body = await request.json()
-    const { id, title, amount, type, category, date } = body
+    const body = await request.json();
+    const { id, title, notes, amount, type, date } = body;
 
     if (!id || isNaN(Number(id))) {
       return NextResponse.json(
         { error: 'ID transaksi tidak valid untuk pembaharuan data' },
         { status: 400 }
-      )
+      );
     }
 
-    // Pastikan amount di-cast ke Number secara eksplisit
-    const numericAmount = Number(amount)
+    const numericAmount = Number(amount);
     if (isNaN(numericAmount)) {
       return NextResponse.json(
         { error: 'Jumlah (amount) harus berupa angka valid' },
         { status: 400 }
-      )
+      );
     }
 
-    const result = await executeOracleQuery(
+    const rawType = String(type || '').trim().toLowerCase();
+    const dbType = (rawType === 'pengeluaran' || rawType === 'expense' || rawType === 'out') 
+      ? 'out' 
+      : 'in';
+
+    const transactionNotes = String(title || notes || 'Transaksi').substring(0, 200);
+
+    const result = await executeQuery(
       `UPDATE transactions 
-       SET title = :title, 
+       SET notes = :notes, 
            amount = :amount, 
            type = :type, 
-           category = :category, 
-           trans_date = TO_DATE(:trans_date, 'YYYY-MM-DD') 
+           transaction_date = TO_DATE(:trx_date, 'YYYY-MM-DD') 
        WHERE id = :id`,
       {
-        title: title || '',
+        notes: transactionNotes,
         amount: numericAmount,
-        type: type || 'pemasukan',
-        category: category || 'Umum',
-        trans_date: date,
+        type: dbType,
+        trx_date: date || new Date().toISOString().split('T')[0],
         id: Number(id)
       }
-    )
+    );
 
-    return NextResponse.json({ success: true, result })
+    return NextResponse.json({ success: true, result });
   } catch (error: any) {
-    console.error('❌ PUT /api/transactions error:', error)
+    console.error('❌ PUT /api/transactions error:', error);
     return NextResponse.json(
       { error: error.message || 'Gagal memperbarui data' },
       { status: 500 }
-    )
+    );
   }
 }
