@@ -3,51 +3,83 @@ import { executeQuery } from '@/lib/oracle/pool'
 
 export const dynamic = 'force-dynamic'
 
-// Helper untuk membaca nilai angka dari rincian objek/array Oracle DB
-function parseOracleAmount(rawRow: any): number {
-  if (!rawRow) return 0
-  
-  let val: any
-  if (Array.isArray(rawRow)) {
-    val = rawRow[0]
-  } else if (typeof rawRow === 'object') {
-    val = rawRow.TOTAL ?? rawRow.total ?? Object.values(rawRow)[0]
-  } else {
-    val = rawRow
+async function parseVal(val: any): Promise<string> {
+  if (val === null || val === undefined) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'number') return String(val)
+  if (typeof val === 'object' && typeof val.read === 'function') {
+    return new Promise((resolve) => {
+      let data = ''
+      val.setEncoding('utf8')
+      val.on('data', (chunk: string) => { data += chunk })
+      val.on('end', () => resolve(data))
+      val.on('error', () => resolve(''))
+    })
   }
-
-  const num = Number(val)
-  return isNaN(num) ? 0 : num
+  return String(val)
 }
 
 export async function GET() {
   try {
-    // 1. Total Seluruh Pemasukan & Pengeluaran (Untuk Total Saldo)
-    const totalIncomeRes: any = await executeQuery(
-      `SELECT NVL(SUM(amount), 0) AS TOTAL FROM transactions WHERE LOWER(type) IN ('pemasukan', 'income', 'in')`
-    )
-    const totalExpenseRes: any = await executeQuery(
-      `SELECT NVL(SUM(amount), 0) AS TOTAL FROM transactions WHERE LOWER(type) IN ('pengeluaran', 'expense', 'out')`
-    )
+    // Ambil seluruh data transaksi
+    const result: any = await executeQuery(`SELECT * FROM transactions`)
+    const rows = result?.rows || (Array.isArray(result) ? result : [])
 
-    const grandTotalPemasukan = parseOracleAmount(totalIncomeRes?.rows?.[0])
-    const grandTotalPengeluaran = parseOracleAmount(totalExpenseRes?.rows?.[0])
-    const totalSaldo = grandTotalPemasukan - grandTotalPengeluaran
+    const now = new Date()
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-    // 2. Pemasukan & Pengeluaran Khusus Bulan Ini
-    const monthIncomeRes: any = await executeQuery(
-      `SELECT NVL(SUM(amount), 0) AS TOTAL FROM transactions 
-       WHERE LOWER(type) IN ('pemasukan', 'income', 'in') 
-       AND TO_CHAR(transaction_date, 'YYYY-MM') = TO_CHAR(SYSDATE, 'YYYY-MM')`
-    )
-    const monthExpenseRes: any = await executeQuery(
-      `SELECT NVL(SUM(amount), 0) AS TOTAL FROM transactions 
-       WHERE LOWER(type) IN ('pengeluaran', 'expense', 'out') 
-       AND TO_CHAR(transaction_date, 'YYYY-MM') = TO_CHAR(SYSDATE, 'YYYY-MM')`
-    )
+    let totalSaldo = 0
+    let pemasukanBulanIni = 0
+    let pengeluaranBulanIni = 0
 
-    const pemasukanBulanIni = parseOracleAmount(monthIncomeRes?.rows?.[0])
-    const pengeluaranBulanIni = parseOracleAmount(monthExpenseRes?.rows?.[0])
+    for (const row of rows) {
+      let rawAmount: any = 0
+      let rawType: any = ''
+      let rawDate: any = ''
+
+      if (Array.isArray(row)) {
+        // Jika Oracle mengembalikan array indeks
+        rawAmount = row[1] ?? row[2] ?? 0
+        rawType = row[3] ?? row[4] ?? ''
+        rawDate = row[0] ?? ''
+      } else if (row && typeof row === 'object') {
+        // Mencari field amount, type, dan date secara fleksibel
+        const keys = Object.keys(row)
+        const amountKey = keys.find(k => /amount|nominal|jumlah|total/i.test(k))
+        const typeKey = keys.find(k => /type|tipe|kategori|jenis/i.test(k))
+        const dateKey = keys.find(k => /date|tanggal|trx_date/i.test(k))
+
+        rawAmount = amountKey ? row[amountKey] : 0
+        rawType = typeKey ? row[typeKey] : ''
+        rawDate = dateKey ? row[dateKey] : ''
+      }
+
+      const amountStr = await parseVal(rawAmount)
+      const typeStr = (await parseVal(rawType)).toLowerCase()
+      const dateStr = await parseVal(rawDate)
+
+      const amount = Number(amountStr) || 0
+      const isExpense = ['pengeluaran', 'expense', 'out', 'keluar'].some(t => typeStr.includes(t))
+
+      // 1. Akumulasi Total Saldo
+      if (isExpense) {
+        totalSaldo -= amount
+      } else {
+        totalSaldo += amount
+      }
+
+      // 2. Akumulasi Bulan Ini
+      // Jika format tanggal mengandung bulan berjalan (misal: 2026-09) atau jika tanggal kosong, tetap dihitung
+      const isCurrentMonth = !dateStr || dateStr.includes(currentYearMonth)
+      
+      if (isCurrentMonth) {
+        if (isExpense) {
+          pengeluaranBulanIni += amount
+        } else {
+          pemasukanBulanIni += amount
+        }
+      }
+    }
 
     return NextResponse.json({
       userEmail: 'adeni9294@gmail.com',
@@ -55,8 +87,8 @@ export async function GET() {
       pemasukanBulanIni,
       pengeluaranBulanIni,
       sisaBudget: 3180000,
-      pemasukanNote: 'Total Kas Masuk Bulan Ini',
-      pengeluaranNote: 'Total Kas Keluar Bulan Ini',
+      pemasukanNote: 'Total Kas Masuk',
+      pengeluaranNote: 'Total Kas Keluar',
       saldoPercentageChange: '+0% dari bulan lalu',
       budgets: [
         { id: 1, category: 'Makanan & Minuman', percentage: 70 },
@@ -70,9 +102,9 @@ export async function GET() {
       ]
     })
   } catch (error: any) {
-    console.error('❌ Database Error di API Summary:', error)
+    console.error('❌ Error API Summary:', error)
     return NextResponse.json(
-      { error: 'Gagal mengambil data ringkasan dari Oracle DB', details: error?.message },
+      { error: 'Gagal mengambil data dari Oracle DB', details: error?.message },
       { status: 500 }
     )
   }
