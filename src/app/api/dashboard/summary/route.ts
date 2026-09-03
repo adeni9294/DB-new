@@ -21,71 +21,48 @@ async function parseVal(val: any): Promise<string> {
 
 export async function GET() {
   try {
-    // Ambil seluruh data transaksi
     const result: any = await executeQuery(`SELECT * FROM transactions`)
     const rows = result?.rows || (Array.isArray(result) ? result : [])
 
-    const now = new Date()
-    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-    let totalSaldo = 0
-    let pemasukanBulanIni = 0
-    let pengeluaranBulanIni = 0
+    let totalPemasukan = 0
+    let totalPengeluaran = 0
 
     for (const row of rows) {
       let rawAmount: any = 0
       let rawType: any = ''
-      let rawDate: any = ''
 
       if (Array.isArray(row)) {
-        // Jika Oracle mengembalikan array indeks
         rawAmount = row[1] ?? row[2] ?? 0
         rawType = row[3] ?? row[4] ?? ''
-        rawDate = row[0] ?? ''
       } else if (row && typeof row === 'object') {
-        // Mencari field amount, type, dan date secara fleksibel
         const keys = Object.keys(row)
         const amountKey = keys.find(k => /amount|nominal|jumlah|total/i.test(k))
         const typeKey = keys.find(k => /type|tipe|kategori|jenis/i.test(k))
-        const dateKey = keys.find(k => /date|tanggal|trx_date/i.test(k))
 
         rawAmount = amountKey ? row[amountKey] : 0
         rawType = typeKey ? row[typeKey] : ''
-        rawDate = dateKey ? row[dateKey] : ''
       }
 
       const amountStr = await parseVal(rawAmount)
       const typeStr = (await parseVal(rawType)).toLowerCase()
-      const dateStr = await parseVal(rawDate)
-
       const amount = Number(amountStr) || 0
+
       const isExpense = ['pengeluaran', 'expense', 'out', 'keluar'].some(t => typeStr.includes(t))
 
-      // 1. Akumulasi Total Saldo
       if (isExpense) {
-        totalSaldo -= amount
+        totalPengeluaran += amount
       } else {
-        totalSaldo += amount
-      }
-
-      // 2. Akumulasi Bulan Ini
-      // Jika format tanggal mengandung bulan berjalan (misal: 2026-09) atau jika tanggal kosong, tetap dihitung
-      const isCurrentMonth = !dateStr || dateStr.includes(currentYearMonth)
-      
-      if (isCurrentMonth) {
-        if (isExpense) {
-          pengeluaranBulanIni += amount
-        } else {
-          pemasukanBulanIni += amount
-        }
+        totalPemasukan += amount
       }
     }
+
+    const totalSaldo = totalPemasukan - totalPengeluaran
 
     return NextResponse.json({
       userEmail: 'adeni9294@gmail.com',
       totalSaldo,
-      pemasukanBulanIni,
-      pengeluaranBulanIni,
+      pemasukanBulanIni: totalPemasukan,
+      pengeluaranBulanIni: totalPengeluaran,
       sisaBudget: 3180000,
       pemasukanNote: 'Total Kas Masuk',
       pengeluaranNote: 'Total Kas Keluar',
