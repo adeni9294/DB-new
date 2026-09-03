@@ -6,7 +6,8 @@ import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react'
 
 type Transaction = {
   id: number
-  title: string
+  title?: string
+  notes?: string       // Ditambahkan untuk menampung field notes dari DB
   amount: number
   type: 'pemasukan' | 'pengeluaran'
   category: string
@@ -67,7 +68,7 @@ export default function KeuanganPage() {
     }
   }, [defaultAction])
 
-  // 2. Submit Data Baru ke Oracle DB - PERBAIKAN: Align dengan API spec
+  // 2. Submit Data Baru ke Oracle DB - DISESUAIKAN: Mengirimkan notes/title agar cocok dengan API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -78,15 +79,14 @@ export default function KeuanganPage() {
 
     setIsSubmitting(true)
     
-    // Payload yang sesuai dengan ekspektasi API
+    // Payload disesuaikan agar mengirim 'notes' (mengikuti backend & kolom database) serta 'title' sebagai cadangan
     const payload = {
       title,
+      notes: title,
       amount: parseFloat(amount),
       type: formType,
       category: category || 'Umum',
       date: new Date().toISOString().split('T')[0],
-      // Jika API juga butuh accountId, tambahkan di sini
-      // accountId: 'DEFAULT_ACCOUNT'
     }
 
     try {
@@ -111,12 +111,10 @@ export default function KeuanganPage() {
       // Reload data dari Oracle
       await fetchTransactions()
       
-      // Optional: Show success message
       console.log('✅ Transaksi berhasil disimpan ke Oracle DB')
     } catch (err: any) {
       console.error('❌ Gagal menyimpan transaksi:', err)
       setError(err.message || 'Gagal menyimpan transaksi')
-      // Jangan tutup modal jika error, biar user bisa retry
     } finally {
       setIsSubmitting(false)
     }
@@ -216,7 +214,8 @@ export default function KeuanganPage() {
                   transactions.map((t) => (
                     <tr key={t.id} className="hover:bg-slate-800/30 transition-all">
                       <td className="p-3 text-slate-400">{t.date}</td>
-                      <td className="p-3 font-semibold text-white">{t.title}</td>
+                      {/* Menampilkan t.title atau t.notes dari database */}
+                      <td className="p-3 font-semibold text-white">{t.title || t.notes}</td>
                       <td className="p-3">{t.category}</td>
                       <td className="p-3">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
