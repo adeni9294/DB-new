@@ -2,28 +2,28 @@ import { executeQuery } from '../pool';
 
 export interface TransactionDTO {
   notes?: string;
-  title?: string; // Tambahkan title sebagai opsional agar kompatibel dengan form frontend
+  title?: string;
   amount: number;
   type: string;
   category?: string;
   categoryId?: string;
   date?: string;
-  userId?: string;
-  accountId?: string;
-  toAccountId?: string;
-  organizationId?: string;
-  eventId?: string;
-  [key: string]: any; // Index signature agar fleksibel untuk properti opsional lainnya
+  userId?: string | number;
+  accountId?: string | number;
+  toAccountId?: string | number;
+  organizationId?: string | number;
+  eventId?: string | number;
+  [key: string]: any;
 }
 
 export interface TransactionFilterParams {
-  userId: string;
+  userId: string | number;
   search?: string;
   type?: 'INCOME' | 'EXPENSE' | 'TRANSFER';
-  accountId?: string;
-  categoryId?: string;
-  organizationId?: string;
-  eventId?: string;
+  accountId?: string | number;
+  categoryId?: string | number;
+  organizationId?: string | number;
+  eventId?: string | number;
   startDate?: string;
   endDate?: string;
   page?: number;
@@ -31,35 +31,94 @@ export interface TransactionFilterParams {
 }
 
 export async function createTransaction(payload: TransactionDTO) {
-  const sql = `
-    INSERT INTO transactions (
-      user_id, 
-      account_id, 
-      type, 
-      amount, 
-      notes, 
-      transaction_date
-    ) VALUES (
-      :userId, 
-      :accountId, 
-      :type, 
-      :amount, 
-      :notes, 
-      TO_DATE(:transactionDate, 'YYYY-MM-DD')
-    )
-  `;
+  const transactionId = 'TRX-' + Date.now();
+  const notesContent = payload.notes || payload.title || '';
 
-  const binds = {
-    userId: payload.userId || 'USER-001',
-    accountId: payload.accountId || 'DEFAULT_ACCOUNT',
-    type: payload.type,
-    amount: payload.amount,
-    notes: payload.notes || payload.title || '',
-    transactionDate: payload.date || new Date().toISOString().split('T')[0],
-  };
+  // 1. Dapatkan USER_ID yang valid (ambil ID=1 dari DB jika tidak ada/salah)
+  let activeUserId: any = payload.userId;
+  if (!activeUserId || activeUserId === 'USER-001') {
+    try {
+      const userRes: any = await executeQuery(`SELECT id FROM users FETCH FIRST 1 ROWS ONLY`);
+      if (userRes?.rows?.[0]) {
+        activeUserId = userRes.rows[0].ID ?? userRes.rows[0].id ?? 1;
+      } else {
+        activeUserId = 1;
+      }
+    } catch {
+      activeUserId = 1;
+    }
+  }
 
-  const result = await executeQuery(sql, binds);
-  return result;
+  // 2. Dapatkan ACCOUNT_ID yang valid dari tabel ACCOUNTS
+  let activeAccountId: any = payload.accountId;
+  if (!activeAccountId || activeAccountId === 'DEFAULT_ACCOUNT') {
+    try {
+      const accRes: any = await executeQuery(`SELECT id FROM accounts FETCH FIRST 1 ROWS ONLY`);
+      if (accRes?.rows?.[0]) {
+        activeAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
+      } else {
+        activeAccountId = null; // Set null jika belum ada akun
+      }
+    } catch {
+      activeAccountId = null;
+    }
+  }
+
+  const transactionDate = payload.date || new Date().toISOString().split('T')[0];
+
+  // 3. Eksekusi Query INSERT dengan ID dan FK yang aman
+  try {
+    const sql = `
+      INSERT INTO transactions (
+        id,
+        user_id, 
+        account_id, 
+        type, 
+        amount, 
+        notes, 
+        transaction_date
+      ) VALUES (
+        :id,
+        :userId, 
+        :accountId, 
+        :type, 
+        :amount, 
+        :notes, 
+        TO_DATE(:transactionDate, 'YYYY-MM-DD')
+      )
+    `;
+
+    const binds = {
+      id: transactionId,
+      userId: activeUserId,
+      accountId: activeAccountId,
+      type: payload.type,
+      amount: payload.amount,
+      notes: notesContent,
+      transactionDate: transactionDate,
+    };
+
+    const result = await executeQuery(sql, binds);
+    return result;
+  } catch (err: any) {
+    // Fallback jika account_id bernilai NULL dan kolomnya tidak mengizinkan NULL
+    console.error('❌ Insert transaksi gagal, mencoba tanpa account_id:', err?.message);
+    const fallbackSql = `
+      INSERT INTO transactions (
+        id, user_id, type, amount, notes, transaction_date
+      ) VALUES (
+        :id, :userId, :type, :amount, :notes, TO_DATE(:transactionDate, 'YYYY-MM-DD')
+      )
+    `;
+    return await executeQuery(fallbackSql, {
+      id: transactionId,
+      userId: activeUserId,
+      type: payload.type,
+      amount: payload.amount,
+      notes: notesContent,
+      transactionDate: transactionDate,
+    });
+  }
 }
 
 export async function getPaginatedTransactions(params: TransactionFilterParams) {
