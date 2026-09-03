@@ -6,16 +6,34 @@ import { executeQuery } from '@/lib/oracle/pool';
 
 export async function GET() {
   try {
-    // Sesuaikan kolom SELECT dengan struktur tabel database: id, notes (sebagai pengganti title), amount, type, category, transaction_date
-    const sql = `SELECT id, notes, amount, type, category, transaction_date as date FROM transactions ORDER BY transaction_date DESC`;
+    // 1. Mengubah alias "date" menjadi "trx_date" untuk menghindari Oracle Reserved Keyword (ORA-00923)
+    // 2. Menghapus kolom 'category' dari SQL jika tidak ada di tabel transactions
+    const sql = `
+      SELECT 
+        id, 
+        notes, 
+        amount, 
+        type, 
+        TO_CHAR(transaction_date, 'YYYY-MM-DD') AS trx_date 
+      FROM transactions 
+      ORDER BY transaction_date DESC, id DESC
+    `;
+    
     const result: any = await executeQuery(sql);
-    
-    // Transform result to array format untuk frontend
-    if (result?.rows && Array.isArray(result.rows)) {
-      return NextResponse.json(result.rows);
-    }
-    
-    return NextResponse.json(result || []);
+    const rawRows = result?.rows || (Array.isArray(result) ? result : []);
+
+    // Format properti objek agar seragam dan aman dikonsumsi Frontend Next.js
+    const formattedData = rawRows.map((row: any) => ({
+      id: row.ID ?? row.id ?? row[0],
+      notes: row.NOTES ?? row.notes ?? row[1] ?? '',
+      title: row.NOTES ?? row.notes ?? row[1] ?? 'Transaksi',
+      amount: Number(row.AMOUNT ?? row.amount ?? row[2] ?? 0),
+      type: (row.TYPE ?? row.type ?? row[3] ?? 'INCOME').toString().toLowerCase(),
+      category: 'Umum',
+      date: row.TRX_DATE ?? row.trx_date ?? row[4] ?? ''
+    }));
+
+    return NextResponse.json(formattedData);
   } catch (error: any) {
     console.error('❌ GET /api/transactions error:', error);
     return NextResponse.json(
@@ -29,7 +47,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Validasi - support field names dari frontend, ubah penangkapan title menjadi notes/title
     const { title, notes, amount, type, category, date, accountId } = body;
     const transactionNotes = title || notes;
 
@@ -49,11 +66,10 @@ export async function POST(request: Request) {
 
     const mockUserId = 'USER-001';
 
-    // Panggil createTransaction dengan payload menggunakan 'notes' sesuai kolom database
     const trxId = await createTransaction({
       notes: transactionNotes,
       amount: parseFloat(String(amount)),
-      type: String(type).toLowerCase(), // normalize: 'pemasukan' atau 'pengeluaran'
+      type: String(type),
       category: category || 'Umum',
       date: date || new Date().toISOString().split('T')[0],
       userId: mockUserId,
