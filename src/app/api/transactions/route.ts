@@ -6,7 +6,8 @@ import { executeQuery } from '@/lib/oracle/pool';
 
 export async function GET() {
   try {
-    const sql = `SELECT id, title, amount, type, category, date FROM transactions ORDER BY date DESC`;
+    // Sesuaikan kolom SELECT dengan struktur tabel database: id, notes (sebagai pengganti title), amount, type, category, transaction_date
+    const sql = `SELECT id, notes, amount, type, category, transaction_date as date FROM transactions ORDER BY transaction_date DESC`;
     const result: any = await executeQuery(sql);
     
     // Transform result to array format untuk frontend
@@ -28,8 +29,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Validasi - support field names dari frontend (title, amount, type, category, date)
-    const { title, amount, type, category, date, accountId } = body;
+    // Validasi - support field names dari frontend, ubah penangkapan title menjadi notes/title
+    const { title, notes, amount, type, category, date, accountId } = body;
+    const transactionNotes = title || notes;
 
     if (!amount || !type) {
       return NextResponse.json(
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!title) {
+    if (!transactionNotes) {
       return NextResponse.json(
         { error: 'Field title/keterangan wajib diisi.' },
         { status: 400 }
@@ -47,9 +49,9 @@ export async function POST(request: Request) {
 
     const mockUserId = 'USER-001';
 
-    // Panggil createTransaction dengan payload yang sudah divalidasi
+    // Panggil createTransaction dengan payload menggunakan 'notes' sesuai kolom database
     const trxId = await createTransaction({
-      title,
+      notes: transactionNotes,
       amount: parseFloat(String(amount)),
       type: String(type).toLowerCase(), // normalize: 'pemasukan' atau 'pengeluaran'
       category: category || 'Umum',
