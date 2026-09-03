@@ -29,6 +29,7 @@ async function extractString(val: any): Promise<string> {
   return String(val);
 }
 
+// --- GET: AMBIL DAFTAR TRANSAKSI ---
 export async function GET() {
   try {
     const sql = `
@@ -69,7 +70,6 @@ export async function GET() {
           notesText = 'Transaksi';
         }
 
-        // Mapping kembali nilai database yang singkat ke format UI
         const cleanType = typeText.toLowerCase();
         const displayType = (cleanType === 'out' || cleanType === 'expense' || cleanType === 'pengeluaran') 
           ? 'pengeluaran' 
@@ -97,17 +97,16 @@ export async function GET() {
   }
 }
 
+// --- POST: TAMBAH TRANSAKSI BARU ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-
     const { title, notes, amount, type, category, date, accountId } = body;
     
     let transactionNotes = title || notes;
     if (typeof transactionNotes === 'object') {
       transactionNotes = JSON.stringify(transactionNotes);
     }
-    // Batasi string notes jika ada constraint max length di DB
     transactionNotes = String(transactionNotes || 'Transaksi').substring(0, 200);
 
     if (!amount || !type) {
@@ -117,7 +116,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Dipersingkat ke 'IN' / 'OUT' atau 'in' / 'out' agar muat di kolom VARCHAR2 yang pendek
     const rawType = String(type).trim().toLowerCase();
     const dbType = (rawType === 'pengeluaran' || rawType === 'expense' || rawType === 'out') 
       ? 'out' 
@@ -128,7 +126,7 @@ export async function POST(request: Request) {
     const trxId = await createTransaction({
       notes: transactionNotes,
       amount: parseFloat(String(amount)),
-      type: dbType, // Mengirim kode singkat ke Oracle DB
+      type: dbType,
       category: category || 'Umum',
       date: date || new Date().toISOString().split('T')[0],
       userId: mockUserId,
@@ -148,6 +146,96 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { 
         error: error?.message || 'Gagal menyimpan transaksi ke Oracle DB', 
+        details: error?.stack || 'Unknown error' 
+      }, 
+      { status: 500 }
+    );
+  }
+}
+
+// --- PUT: EDIT / UPDATE TRANSAKSI ---
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, title, notes, amount, type, date } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID transaksi wajib disertakan untuk update.' },
+        { status: 400 }
+      );
+    }
+
+    let transactionNotes = title || notes;
+    if (typeof transactionNotes === 'object') {
+      transactionNotes = JSON.stringify(transactionNotes);
+    }
+    transactionNotes = String(transactionNotes || 'Transaksi').substring(0, 200);
+
+    const rawType = String(type).trim().toLowerCase();
+    const dbType = (rawType === 'pengeluaran' || rawType === 'expense' || rawType === 'out') 
+      ? 'out' 
+      : 'in';
+
+    const sql = `
+      UPDATE transactions 
+      SET 
+        notes = :notes,
+        amount = :amount,
+        type = :type,
+        transaction_date = TO_DATE(:trx_date, 'YYYY-MM-DD')
+      WHERE id = :id
+    `;
+
+    await executeQuery(sql, {
+      notes: transactionNotes,
+      amount: parseFloat(String(amount || 0)),
+      type: dbType,
+      trx_date: date || new Date().toISOString().split('T')[0],
+      id: Number(id)
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Transaksi berhasil diperbarui di Oracle DB.'
+    });
+  } catch (error: any) {
+    console.error('❌ PUT /api/transactions error:', error);
+    return NextResponse.json(
+      { 
+        error: error?.message || 'Gagal memperbarui transaksi di Oracle DB', 
+        details: error?.stack || 'Unknown error' 
+      }, 
+      { status: 500 }
+    );
+  }
+}
+
+// --- DELETE: HAPUS TRANSAKSI ---
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID transaksi wajib disertakan di query parameter (?id=...)' },
+        { status: 400 }
+      );
+    }
+
+    const sql = `DELETE FROM transactions WHERE id = :id`;
+    await executeQuery(sql, { id: Number(id) });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Transaksi berhasil dihapus dari Oracle DB.'
+    });
+  } catch (error: any) {
+    console.error('❌ DELETE /api/transactions error:', error);
+    return NextResponse.json(
+      { 
+        error: error?.message || 'Gagal menghapus transaksi dari Oracle DB', 
         details: error?.stack || 'Unknown error' 
       }, 
       { status: 500 }
