@@ -45,10 +45,9 @@ function KeuanganContent() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Helper mendapatkan format tanggal lokal YYYY-MM-DD
   const getTodayString = () => {
     const today = new Date()
-    return today.toLocaleDateString('en-CA') // Format YYYY-MM-DD
+    return today.toLocaleDateString('en-CA')
   }
 
   // 1. Fetch Data dari Oracle DB
@@ -342,7 +341,7 @@ function KeuanganContent() {
                         </td>
                       </tr>
                     )
-                   routine
+                  })
                 )}
               </tbody>
             </table>
