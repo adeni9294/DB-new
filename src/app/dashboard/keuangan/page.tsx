@@ -1,20 +1,20 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PlusCircle, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react'
 
 type Transaction = {
-  id: number
+  id: string | number
   title?: string
-  notes?: string       // Ditambahkan untuk menampung field notes dari DB
+  notes?: string
   amount: number
-  type: 'pemasukan' | 'pengeluaran'
-  category: string
+  type: string
+  category?: string
   date: string
 }
 
-export default function KeuanganPage() {
+function KeuanganContent() {
   const searchParams = useSearchParams()
   const defaultAction = searchParams.get('action')
 
@@ -41,8 +41,6 @@ export default function KeuanganPage() {
       }
       
       const data = await res.json()
-      
-      // Handle both array response dan object response dengan rows property
       const transactionList = Array.isArray(data) ? data : (data.rows || [])
       setTransactions(transactionList)
     } catch (err) {
@@ -68,7 +66,14 @@ export default function KeuanganPage() {
     }
   }, [defaultAction])
 
-  // 2. Submit Data Baru ke Oracle DB - DISESUAIKAN: Mengirimkan notes/title agar cocok dengan API
+  // Helper untuk mengecek apakah transaksi bertipe Pemasukan/Income
+  const isIncome = (typeStr: string) => {
+    if (!typeStr) return false
+    const val = typeStr.toString().trim().toUpperCase()
+    return val === 'INCOME' || val === 'PEMASUKAN' || val === 'IN'
+  }
+
+  // 2. Submit Data Baru ke Oracle DB
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -79,7 +84,6 @@ export default function KeuanganPage() {
 
     setIsSubmitting(true)
     
-    // Payload disesuaikan agar mengirim 'notes' (mengikuti backend & kolom database) serta 'title' sebagai cadangan
     const payload = {
       title,
       notes: title,
@@ -101,17 +105,13 @@ export default function KeuanganPage() {
         throw new Error(errorData.error || `API error: ${res.status}`)
       }
 
-      // SUCCESS: Reset form dan reload data
       setIsModalOpen(false)
       setTitle('')
       setAmount('')
       setCategory('')
       setError(null)
       
-      // Reload data dari Oracle
       await fetchTransactions()
-      
-      console.log('✅ Transaksi berhasil disimpan ke Oracle DB')
     } catch (err: any) {
       console.error('❌ Gagal menyimpan transaksi:', err)
       setError(err.message || 'Gagal menyimpan transaksi')
@@ -120,13 +120,14 @@ export default function KeuanganPage() {
     }
   }
 
+  // Kalkulasi total dengan pengecekan type yang fleksibel
   const totalPemasukan = transactions
-    .filter(t => t.type === 'pemasukan')
-    .reduce((acc, curr) => acc + Number(curr.amount), 0)
+    .filter(t => isIncome(t.type))
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
   const totalPengeluaran = transactions
-    .filter(t => t.type === 'pengeluaran')
-    .reduce((acc, curr) => acc + Number(curr.amount), 0)
+    .filter(t => !isIncome(t.type))
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0)
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto text-slate-100">
@@ -211,26 +212,28 @@ export default function KeuanganPage() {
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-800/30 transition-all">
-                      <td className="p-3 text-slate-400">{t.date}</td>
-                      {/* Menampilkan t.title atau t.notes dari database */}
-                      <td className="p-3 font-semibold text-white">{t.title || t.notes}</td>
-                      <td className="p-3">{t.category}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
-                          t.type === 'pemasukan' 
-                            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        }`}>
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className={`p-3 text-right font-bold ${t.type === 'pemasukan' ? 'text-cyan-400' : 'text-rose-400'}`}>
-                        {t.type === 'pemasukan' ? '+' : '-'} Rp {Number(t.amount).toLocaleString('id-ID')}
-                      </td>
-                    </tr>
-                  ))
+                  transactions.map((t) => {
+                    const income = isIncome(t.type)
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-800/30 transition-all">
+                        <td className="p-3 text-slate-400">{t.date || '-'}</td>
+                        <td className="p-3 font-semibold text-white">{t.title || t.notes || 'Transaksi'}</td>
+                        <td className="p-3">{t.category || 'Umum'}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${
+                            income 
+                              ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' 
+                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          }`}>
+                            {income ? 'pemasukan' : 'pengeluaran'}
+                          </span>
+                        </td>
+                        <td className={`p-3 text-right font-bold ${income ? 'text-cyan-400' : 'text-rose-400'}`}>
+                          {income ? '+' : '-'} Rp {Number(t.amount || 0).toLocaleString('id-ID')}
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -315,5 +318,13 @@ export default function KeuanganPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function KeuanganPage() {
+  return (
+    <Suspense fallback={<p className="text-xs text-slate-400 p-6">Memuat...</p>}>
+      <KeuanganContent />
+    </Suspense>
   )
 }
