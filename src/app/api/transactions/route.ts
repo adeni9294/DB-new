@@ -66,6 +66,11 @@ export async function GET() {
         const typeText = await extractString(rawType);
         const dateText = await extractString(rawDate);
 
+        // Bersihkan ID dari karakter non-angka
+        const cleanIdStr = idText.replace(/\D/g, '');
+        const parsedId = parseInt(cleanIdStr, 10);
+        const finalId = isNaN(parsedId) ? idText : parsedId;
+
         if (!notesText || notesText.trim() === '[object Object]') {
           notesText = 'Transaksi';
         }
@@ -76,7 +81,7 @@ export async function GET() {
           : 'pemasukan';
 
         return {
-          id: idText,
+          id: finalId,
           notes: notesText,
           title: notesText,
           amount: Number(amountText) || 0,
@@ -159,9 +164,11 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { id, title, notes, amount, type, date } = body;
 
-    if (!id) {
+    const numericId = parseInt(String(id).replace(/\D/g, ''), 10);
+
+    if (!id || isNaN(numericId)) {
       return NextResponse.json(
-        { error: 'ID transaksi wajib disertakan untuk update.' },
+        { error: 'ID transaksi wajib disertakan dan berupa angka valid.' },
         { status: 400 }
       );
     }
@@ -192,7 +199,7 @@ export async function PUT(request: Request) {
       amount: parseFloat(String(amount || 0)),
       type: dbType,
       trx_date: date || new Date().toISOString().split('T')[0],
-      id: Number(id)
+      id: numericId
     });
 
     return NextResponse.json({
@@ -215,17 +222,28 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    const rawId = searchParams.get('id');
 
-    if (!id) {
+    if (!rawId) {
       return NextResponse.json(
         { error: 'ID transaksi wajib disertakan di query parameter (?id=...)' },
         { status: 400 }
       );
     }
 
+    // Hanya ambil karakter angka dari parameter id
+    const cleanIdStr = String(rawId).replace(/\D/g, '');
+    const numericId = parseInt(cleanIdStr, 10);
+
+    if (isNaN(numericId)) {
+      return NextResponse.json(
+        { error: `ID transaksi (${rawId}) bukan merupakan angka yang valid.` },
+        { status: 400 }
+      );
+    }
+
     const sql = `DELETE FROM transactions WHERE id = :id`;
-    await executeQuery(sql, { id: Number(id) });
+    await executeQuery(sql, { id: numericId });
 
     return NextResponse.json({
       success: true,
