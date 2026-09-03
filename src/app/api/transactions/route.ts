@@ -4,20 +4,31 @@ import { NextResponse } from 'next/server';
 import { createTransaction } from '@/lib/oracle/repositories/transactionRepository';
 import { executeQuery } from '@/lib/oracle/pool';
 
-// Helper khusus untuk mengekstrak string murni dari berbagai tipe data Oracle (Object, CLOB, Buffer, dsb)
-function toCleanString(val: any): string {
+// Helper Async untuk membaca data jika kolom bertipe Lob (CLOB) atau objek bertingkat
+async function extractString(val: any): Promise<string> {
   if (val === null || val === undefined) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number') return String(val);
-  
-  // Jika Oracle mengembalikan Objek Wrapper (CLOB / Column Object)
+
+  // Jika Oracle mengembalikan Stream Lob / CLOB
+  if (typeof val === 'object' && typeof val.read === 'function') {
+    return new Promise((resolve) => {
+      let data = '';
+      val.setEncoding('utf8');
+      val.on('data', (chunk: string) => { data += chunk; });
+      val.on('end', () => resolve(data));
+      val.on('error', () => resolve(''));
+    });
+  }
+
+  // Jika berupa object wrapper Oracle
   if (typeof val === 'object') {
-    if (val.val !== undefined) return toCleanString(val.val);
-    if (val.value !== undefined) return toCleanString(val.value);
-    if (val.text !== undefined) return toCleanString(val.text);
+    if (val.val !== undefined) return extractString(val.val);
+    if (val.value !== undefined) return extractString(val.value);
+    if (val.text !== undefined) return extractString(val.text);
     if (Buffer.isBuffer(val)) return val.toString('utf-8');
   }
-  
+
   return String(val);
 }
 
@@ -35,36 +46,44 @@ export async function GET() {
     `;
     
     const result: any = await executeQuery(sql);
-    
     const rawRows = result?.rows || (Array.isArray(result) ? result : []);
 
-    const formattedData = rawRows.map((row: any) => {
-      let rawId, rawNotes, rawAmount, rawType, rawDate;
+    const formattedData = await Promise.all(
+      rawRows.map(async (row: any) => {
+        let rawId, rawNotes, rawAmount, rawType, rawDate;
 
-      if (Array.isArray(row)) {
-        // Jika format query berupa ARRAY [id, notes, amount, type, trx_date]
-        [rawId, rawNotes, rawAmount, rawType, rawDate] = row;
-      } else if (row && typeof row === 'object') {
-        // Jika format query berupa OBJECT { ID, NOTES, ... }
-        rawId = row.ID ?? row.id;
-        rawNotes = row.NOTES ?? row.notes;
-        rawAmount = row.AMOUNT ?? row.amount;
-        rawType = row.TYPE ?? row.type;
-        rawDate = row.TRX_DATE ?? row.trx_date;
-      }
+        if (Array.isArray(row)) {
+          [rawId, rawNotes, rawAmount, rawType, rawDate] = row;
+        } else if (row && typeof row === 'object') {
+          rawId = row.ID ?? row.id;
+          rawNotes = row.NOTES ?? row.notes;
+          rawAmount = row.AMOUNT ?? row.amount;
+          rawType = row.TYPE ?? row.type;
+          rawDate = row.TRX_DATE ?? row.trx_date;
+        }
 
-      const notesText = toCleanString(rawNotes);
+        let notesText = await extractString(rawNotes);
+        const idText = await extractString(rawId);
+        const amountText = await extractString(rawAmount);
+        const typeText = await extractString(rawType);
+        const dateText = await extractString(rawDate);
 
-      return {
-        id: toCleanString(rawId),
-        notes: notesText,
-        title: notesText || 'Transaksi',
-        amount: Number(toCleanString(rawAmount)) || 0,
-        type: toCleanString(rawType).toLowerCase() || 'pemasukan',
-        category: 'Umum',
-        date: toCleanString(rawDate)
-      };
-    });
+        // Jika data di database memang terlanjur tersimpan tulisan "[object Object]"
+        if (!notesText || notesText.trim() === '[object Object]') {
+          notesText = 'Transaksi Pemasukan';
+        }
+
+        return {
+          id: idText,
+          notes: notesText,
+          title: notesText,
+          amount: Number(amountText) || 0,
+          type: typeText.toLowerCase() || 'pemasukan',
+          category: 'Umum',
+          date: dateText
+        };
+      })
+    );
 
     return NextResponse.json(formattedData);
   } catch (error: any) {
@@ -81,7 +100,13 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const { title, notes, amount, type, category, date, accountId } = body;
-    const transactionNotes = title || notes;
+    
+    // Pastikan nilai notes murni berupa string primitif
+    let transactionNotes = title || notes;
+    if (typeof transactionNotes === 'object') {
+      transactionNotes = JSON.stringify(transactionNotes);
+    }
+    transactionNotes = String(transactionNotes || 'Transaksi');
 
     if (!amount || !type) {
       return NextResponse.json(
@@ -90,17 +115,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!transactionNotes) {
-      return NextResponse.json(
-        { error: 'Field title/keterangan wajib diisi.' },
-        { status: 400 }
-      );
-    }
-
     const mockUserId = 'USER-001';
 
     const trxId = await createTransaction({
-      notes: String(transactionNotes),
+      notes: transactionNotes,
       amount: parseFloat(String(amount)),
       type: String(type),
       category: category || 'Umum',
