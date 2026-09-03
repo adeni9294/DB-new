@@ -2,89 +2,88 @@ import { executeQuery } from '../pool';
 
 export interface TransactionDTO {
   amount: number;
-  accountId?: string | number | null;
+  accountId?: string | number;
   type: string;
   category?: string;
   notes?: string;
   title?: string;
   description?: string;
   date?: string;
-  userId?: string | number | null;
+  userId?: string | number;
   [key: string]: any;
 }
 
-export async function createTransaction(data: TransactionDTO): Promise<string> {
-  const transactionId = 'TRX-' + Date.now();
-  const notesContent = data.notes || data.title || data.description || '';
+export async function createTransaction(payload: TransactionDTO) {
+  try {
+    const rawId = 'TRX-' + Date.now();
+    const notesContent = payload.notes || payload.title || payload.description || '';
+    const transactionDate = payload.date || new Date().toISOString().split('T')[0];
 
-  // 1. Ambil ID User valid dari tabel USERS (fallback: angka 1)
-  let activeUserId: any = data.userId || null;
-  if (!activeUserId) {
-    try {
-      const userRes: any = await executeQuery(`SELECT id FROM users FETCH FIRST 1 ROWS ONLY`);
+    // 1. Ambil User ID yang benar-benar ada di tabel USERS
+    let validUserId: any = payload.userId;
+    if (!validUserId || validUserId === 'USER-001') {
+      const userRes: any = await executeQuery(`SELECT id FROM users WHERE ROWNUM <= 1`);
       if (userRes?.rows?.[0]) {
-        activeUserId = userRes.rows[0].ID ?? userRes.rows[0].id ?? 1;
+        validUserId = userRes.rows[0].ID ?? userRes.rows[0].id;
       } else {
-        activeUserId = 1;
+        validUserId = 1; // Fallback jika tabel users ber-ID angka
       }
-    } catch {
-      activeUserId = 1;
     }
-  }
 
-  // 2. Cek apakah ada Account ID yang bisa dipakai. Jika kosong, buat akun default otomatis.
-  let activeAccountId: any = data.accountId || null;
-  if (!activeAccountId || activeAccountId === 'DEFAULT_ACCOUNT') {
-    try {
-      const accRes: any = await executeQuery(`SELECT id FROM accounts FETCH FIRST 1 ROWS ONLY`);
+    // 2. Ambil Account ID yang benar-benar ada di tabel ACCOUNTS
+    let validAccountId: any = payload.accountId;
+    if (!validAccountId || validAccountId === 'DEFAULT_ACCOUNT' || validAccountId === 'ACC-DEFAULT') {
+      const accRes: any = await executeQuery(`SELECT id FROM accounts WHERE ROWNUM <= 1`);
+      
       if (accRes?.rows?.[0]) {
-        activeAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
+        validAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
       } else {
-        // Buat akun default di tabel ACCOUNTS jika tabel kosong
-        const newAccId = 'ACC-DEFAULT';
+        // Jika tabel accounts masih kosong, buat akun default dengan ID angka/unik
+        const newAccId = Date.now(); 
         await executeQuery(
           `INSERT INTO accounts (id, name, type, balance, user_id) VALUES (:id, :name, :type, :balance, :userId)`,
-          { id: newAccId, name: 'Kas Utama', type: 'CASH', balance: 0, userId: activeUserId }
+          { id: newAccId, name: 'Kas Utama', type: 'CASH', balance: 0, userId: validUserId }
         );
-        activeAccountId = newAccId;
+        validAccountId = newAccId;
       }
-    } catch (e) {
-      console.warn('⚠️ Gagal mengambil/membuat account_id, mencoba NULL:', e);
-      activeAccountId = null;
     }
-  }
 
-  // 3. Simpan transaksi
-  try {
+    // 3. Eksekusi Insert Transaksi dengan data yang dijamin tidak NULL
     const sql = `
-      INSERT INTO transactions (id, amount, account_id, type, notes, user_id, transaction_date)
-      VALUES (:id, :amount, :accountId, :type, :notes, :userId, SYSDATE)
+      INSERT INTO transactions (
+        id,
+        user_id, 
+        account_id, 
+        type, 
+        amount, 
+        notes, 
+        transaction_date
+      ) VALUES (
+        :id,
+        :userId, 
+        :accountId, 
+        :type, 
+        :amount, 
+        :notes, 
+        TO_DATE(:transactionDate, 'YYYY-MM-DD')
+      )
     `;
 
-    await executeQuery(sql, {
-      id: transactionId,
-      amount: data.amount,
-      accountId: activeAccountId,
-      type: data.type,
+    const binds = {
+      id: rawId,
+      userId: validUserId,
+      accountId: validAccountId,
+      type: payload.type || 'INCOME',
+      amount: Number(payload.amount),
       notes: notesContent,
-      userId: activeUserId,
-    });
+      transactionDate: transactionDate,
+    };
 
-    return transactionId;
-  } catch (dbError: any) {
-    // Jika masih gagal karena FK Constraint account_id, jalankan Fallback Insert tanpa account_id
-    console.error('❌ Direct INSERT failed, trying fallback query:', dbError?.message);
-    const fallbackSql = `
-      INSERT INTO transactions (id, amount, type, notes, user_id, transaction_date)
-      VALUES (:id, :amount, :type, :notes, :userId, SYSDATE)
-    `;
-    await executeQuery(fallbackSql, {
-      id: transactionId,
-      amount: data.amount,
-      type: data.type,
-      notes: notesContent,
-      userId: activeUserId,
-    });
-    return transactionId;
+    const result = await executeQuery(sql, binds);
+    return result;
+
+  } catch (err: any) {
+    console.error('❌ CRITICAL TRANSACTION ERROR:', err?.message);
+    throw new Error(err?.message || 'Gagal menyimpan transaksi ke Oracle DB');
   }
 }
