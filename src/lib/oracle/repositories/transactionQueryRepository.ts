@@ -1,5 +1,21 @@
 import { executeQuery } from '../pool';
 
+export interface TransactionDTO {
+  notes?: string;
+  title?: string; // Tambahkan title sebagai opsional agar kompatibel dengan form frontend
+  amount: number;
+  type: string;
+  category?: string;
+  categoryId?: string;
+  date?: string;
+  userId?: string;
+  accountId?: string;
+  toAccountId?: string;
+  organizationId?: string;
+  eventId?: string;
+  [key: string]: any; // Index signature agar fleksibel untuk properti opsional lainnya
+}
+
 export interface TransactionFilterParams {
   userId: string;
   search?: string;
@@ -12,6 +28,38 @@ export interface TransactionFilterParams {
   endDate?: string;
   page?: number;
   limit?: number;
+}
+
+export async function createTransaction(payload: TransactionDTO) {
+  const sql = `
+    INSERT INTO transactions (
+      user_id, 
+      account_id, 
+      type, 
+      amount, 
+      notes, 
+      transaction_date
+    ) VALUES (
+      :userId, 
+      :accountId, 
+      :type, 
+      :amount, 
+      :notes, 
+      TO_DATE(:transactionDate, 'YYYY-MM-DD')
+    )
+  `;
+
+  const binds = {
+    userId: payload.userId || 'USER-001',
+    accountId: payload.accountId || 'DEFAULT_ACCOUNT',
+    type: payload.type,
+    amount: payload.amount,
+    notes: payload.notes || payload.title || '',
+    transactionDate: payload.date || new Date().toISOString().split('T')[0],
+  };
+
+  const result = await executeQuery(sql, binds);
+  return result;
 }
 
 export async function getPaginatedTransactions(params: TransactionFilterParams) {
