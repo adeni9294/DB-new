@@ -4,6 +4,21 @@ import { NextResponse } from 'next/server';
 import { createTransaction } from '@/lib/oracle/repositories/transactionRepository';
 import { executeQuery } from '@/lib/oracle/pool';
 
+// Helper untuk mengekstrak teks asli jika nilainya berbentuk Objek dari Oracle
+function parseStringValue(val: any): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number') return String(val);
+  if (typeof val === 'object') {
+    // Jika Oracle mengembalikan object { val: 'text' } atau sejenisnya
+    if (val.val !== undefined) return String(val.val);
+    if (val.value !== undefined) return String(val.value);
+    if (val.text !== undefined) return String(val.text);
+    return JSON.stringify(val);
+  }
+  return String(val);
+}
+
 export async function GET() {
   try {
     const sql = `
@@ -19,7 +34,6 @@ export async function GET() {
     
     const result: any = await executeQuery(sql);
     
-    // Ekstrak baris data secara aman dari objek/array Oracle
     let rawRows: any[] = [];
     if (result && Array.isArray(result.rows)) {
       rawRows = result.rows;
@@ -27,22 +41,23 @@ export async function GET() {
       rawRows = result;
     }
 
-    // Ubah data ke objek JavaScript polos (bebas circular reference)
     const formattedData = rawRows.map((row: any) => {
-      const id = row.ID ?? row.id ?? row[0] ?? '';
-      const notes = row.NOTES ?? row.notes ?? row[1] ?? '';
-      const amount = Number(row.AMOUNT ?? row.amount ?? row[2] ?? 0);
-      const rawType = (row.TYPE ?? row.type ?? row[3] ?? 'INCOME').toString();
-      const date = row.TRX_DATE ?? row.trx_date ?? row[4] ?? '';
+      const rawId = row.ID ?? row.id ?? row[0];
+      const rawNotes = row.NOTES ?? row.notes ?? row[1];
+      const rawAmount = row.AMOUNT ?? row.amount ?? row[2];
+      const rawType = row.TYPE ?? row.type ?? row[3];
+      const rawDate = row.TRX_DATE ?? row.trx_date ?? row[4];
+
+      const notesText = parseStringValue(rawNotes);
 
       return {
-        id: String(id),
-        notes: String(notes),
-        title: String(notes) || 'Transaksi',
-        amount: isNaN(amount) ? 0 : amount,
-        type: rawType.toLowerCase(),
+        id: parseStringValue(rawId),
+        notes: notesText,
+        title: notesText || 'Transaksi',
+        amount: Number(parseStringValue(rawAmount)) || 0,
+        type: parseStringValue(rawType).toLowerCase() || 'income',
         category: 'Umum',
-        date: String(date)
+        date: parseStringValue(rawDate)
       };
     });
 
@@ -80,7 +95,7 @@ export async function POST(request: Request) {
     const mockUserId = 'USER-001';
 
     const trxId = await createTransaction({
-      notes: transactionNotes,
+      notes: String(transactionNotes),
       amount: parseFloat(String(amount)),
       type: String(type),
       category: category || 'Umum',
