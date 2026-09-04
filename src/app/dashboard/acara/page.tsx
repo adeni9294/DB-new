@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 
 interface EventItem {
-  ID: string;
-  TITLE: string;
-  START_DATE: string;
-  END_DATE?: string;
-  LOCATION: string;
-  STATUS?: string;
+  id: string;
+  title: string;
+  startDate: string;
+  endDate?: string;
+  location: string;
+  status?: string;
 }
 
 interface ToastNotification {
@@ -93,12 +93,12 @@ export default function AcaraPage() {
   };
 
   const handleOpenEdit = (item: EventItem) => {
-    setEditingId(item.ID);
+    setEditingId(item.id);
     setFormData({
-      title: item.TITLE || "",
-      startDate: formatForInput(item.START_DATE),
-      endDate: formatForInput(item.END_DATE),
-      location: item.LOCATION || "",
+      title: item.tittle || "",
+      startDate: formatForInput(item.startDate),
+      endDate: formatForInput(item.endDate),
+      location: item.location || "",
     });
     setIsModalOpen(true);
   };
@@ -241,18 +241,18 @@ export default function AcaraPage() {
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {events.map((item) => (
-                  <tr key={item.ID} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-6 py-4 font-semibold text-white">
                       <div className="flex items-center gap-3">
                         <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
-                        {item.TITLE}
+                        {item.tittle}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-300">
-                      {formatDateDisplay(item.START_DATE)}
+                      {formatDateDisplay(item.startDate)}
                     </td>
                     <td className="px-6 py-4 text-slate-400">
-                      {formatDateDisplay(item.END_DATE)}
+                      {formatDateDisplay(item.item.endDate)}
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300">
@@ -260,7 +260,7 @@ export default function AcaraPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        {item.LOCATION}
+                        {item.location}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -272,7 +272,7 @@ export default function AcaraPage() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(item.ID)}
+                          onClick={() => handleDelete(item.id)}
                           className="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-xs font-medium transition"
                         >
                           Hapus
