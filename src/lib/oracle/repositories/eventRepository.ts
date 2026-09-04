@@ -14,6 +14,13 @@ export interface EventRecord {
   UPDATED_AT?: Date;
 }
 
+// Helper untuk membersihkan format tanggal agar sesuai dengan TO_DATE Oracle
+const formatDateTimeForOracle = (dateTimeStr?: string) => {
+  if (!dateTimeStr) return "";
+  // Mengambil 16 karakter pertama (YYYY-MM-DDTHH:mm)
+  return dateTimeStr.substring(0, 16);
+};
+
 export async function getAllEvents() {
   const sql = `
     SELECT 
@@ -30,17 +37,17 @@ export async function getAllEvents() {
   
   const result: any = await executeQuery(sql);
   
-  // Oracle node-oracledb mengembalikan rows sebagai array of arrays atau array of objects
   return (result?.rows || []).map((row: any) => ({
-    ID: row.ID || row[0],
-    TITLE: row.TITLE || row[1],
-    START_DATE: row.START_DATE || row[2],
-    END_DATE: row.END_DATE || row[3],
-    LOCATION: row.LOCATION || row[4],
-    STATUS: row.STATUS || row[5],
-    DESCRIPTION: row.DESCRIPTION || row[6],
+    ID: row.ID ?? row[0],
+    TITLE: row.TITLE ?? row[1],
+    START_DATE: row.START_DATE ?? row[2],
+    END_DATE: row.END_DATE ?? row[3],
+    LOCATION: row.LOCATION ?? row[4],
+    STATUS: row.STATUS ?? row[5],
+    DESCRIPTION: row.DESCRIPTION ?? row[6],
   }));
 }
+
 export async function createEvent(data: { 
   title: string; 
   startDate: string; 
@@ -50,6 +57,8 @@ export async function createEvent(data: {
 }) {
   const id = Date.now().toString();
   const createdBy = data.createdBy || 'ADMIN'; 
+  const cleanStartDate = formatDateTimeForOracle(data.startDate);
+  const cleanEndDate = formatDateTimeForOracle(data.endDate || data.startDate);
 
   const sql = `
     INSERT INTO EVENTS (
@@ -74,19 +83,27 @@ export async function createEvent(data: {
     )
   `;
   
-  await executeQuery(sql, {
-    id,
-    createdBy,
-    title: data.title,
-    startDate: data.startDate,
-    endDate: data.endDate || data.startDate,
-    location: data.location,
-  });
+  // Opsi { autoCommit: true } wajib dikirim agar data tersimpan permanen
+  await executeQuery(
+    sql, 
+    {
+      id,
+      createdBy,
+      title: data.title,
+      startDate: cleanStartDate,
+      endDate: cleanEndDate,
+      location: data.location,
+    },
+    { autoCommit: true }
+  );
 
   return { id, ...data };
 }
 
 export async function updateEvent(id: string, data: { title: string; startDate: string; endDate?: string; location: string }) {
+  const cleanStartDate = formatDateTimeForOracle(data.startDate);
+  const cleanEndDate = formatDateTimeForOracle(data.endDate || data.startDate);
+
   const sql = `
     UPDATE EVENTS 
     SET TITLE = :title, 
@@ -97,19 +114,23 @@ export async function updateEvent(id: string, data: { title: string; startDate: 
     WHERE ID = :id
   `;
 
-  await executeQuery(sql, {
-    id,
-    title: data.title,
-    startDate: data.startDate,
-    endDate: data.endDate || data.startDate,
-    location: data.location,
-  });
+  await executeQuery(
+    sql, 
+    {
+      id,
+      title: data.title,
+      startDate: cleanStartDate,
+      endDate: cleanEndDate,
+      location: data.location,
+    },
+    { autoCommit: true }
+  );
 
   return { id, ...data };
 }
 
 export async function deleteEvent(id: string) {
   const sql = `DELETE FROM EVENTS WHERE ID = :id`;
-  await executeQuery(sql, { id });
+  await executeQuery(sql, { id }, { autoCommit: true });
   return true;
 }
