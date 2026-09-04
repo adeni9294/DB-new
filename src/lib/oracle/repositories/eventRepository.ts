@@ -30,12 +30,12 @@ export async function createEvent(data: {
   startDate: string; 
   endDate?: string; 
   location: string;
-  createdBy?: string; // Tambahkan opsional createdBy
+  createdBy?: string; 
 }) {
   const id = Date.now().toString();
-  // Gunakan ID user login atau fallback ke 'ADMIN'
   const createdBy = data.createdBy || 'ADMIN'; 
 
+  // Menggunakan STATUS 'UPCOMING' (sesuai standar constraint Oracle)
   const sql = `
     INSERT INTO EVENTS (
       ID, 
@@ -54,7 +54,7 @@ export async function createEvent(data: {
       TO_DATE(:startDate, 'YYYY-MM-DD"T"HH24:MI'), 
       TO_DATE(:endDate, 'YYYY-MM-DD"T"HH24:MI'), 
       :location, 
-      'SCHEDULED', 
+      'UPCOMING', 
       SYSDATE
     )
   `;
