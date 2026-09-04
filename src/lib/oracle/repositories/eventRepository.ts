@@ -20,8 +20,9 @@ export async function getAllEvents() {
     FROM EVENTS 
     ORDER BY CREATED_AT DESC
   `;
-  const result = await executeQuery<EventRecord>(sql);
-  return result.rows || [];
+  // Hapus <EventRecord> dari executeQuery dan gunakan casting 'as any'
+  const result: any = await executeQuery(sql);
+  return (result?.rows || []) as EventRecord[];
 }
 
 export async function createEvent(data: { title: string; startDate: string; endDate?: string; location: string }) {
