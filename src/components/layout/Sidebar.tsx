@@ -8,45 +8,43 @@ type MenuItem = {
   key: string;
   label: string;
   href: string;
-  icon?: React.ReactNode;
 };
 
 const menu: MenuItem[] = [
   { key: "dashboard", label: "Ringkasan", href: "/dashboard" },
-  { key: "keuangan", label: "Keuangan", href: "/keuangan" },
-  { key: "acara", label: "Acara & Kegiatan", href: "/acara" },
-  { key: "pengaturan", label: "Pengaturan", href: "/pengaturan" },
+  { key: "keuangan", label: "Keuangan", href: "/dashboard/keuangan" },
+  { key: "acara", label: "Acara & Kegiatan", href: "/dashboard/acara" },
+  { key: "pengaturan", label: "Pengaturan", href: "/dashboard/pengaturan" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // State untuk minimize & user dinamis
+  // State untuk minimize & data user dinamis
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [userEmail, setUserEmail] = useState<string>("Loading...");
+  const [userData, setUserData] = useState<{ name: string; email: string }>({
+    name: "Loading...",
+    email: "...",
+  });
 
-  // Ambil data user secara dinamis saat komponen dimuat
+  // Ambil data profil (Nama & Email) dari Oracle via API Profile
   useEffect(() => {
     async function fetchUserData() {
       try {
-        // 1. Cek dari localStorage jika disimpan lokal
-        const storedEmail = localStorage.getItem("userEmail") || localStorage.getItem("email");
-        if (storedEmail) {
-          setUserEmail(storedEmail);
-          return;
-        }
-
-        // 2. Ambil dari API session auth
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/user/profile");
         if (res.ok) {
           const data = await res.json();
-          setUserEmail(data?.email || "User Account");
+          setUserData({
+            name: data.name || "Pengguna",
+            email: data.email || "",
+          });
         } else {
-          setUserEmail("User Account");
+          setUserData({ name: "Pengguna", email: "" });
         }
       } catch (err) {
-        setUserEmail("User Account");
+        console.error("Gagal memuat profil sidebar:", err);
+        setUserData({ name: "Pengguna", email: "" });
       }
     }
 
@@ -66,11 +64,15 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (!pathname) return false;
+    if (href === "/dashboard") return pathname === "/dashboard";
     return pathname === href || pathname.startsWith(href + "/");
   };
 
-  // Inisial avatar user
-  const initial = userEmail && userEmail !== "Loading..." ? userEmail.charAt(0).toUpperCase() : "U";
+  // Inisial avatar berdasarkan Nama Lengkap
+  const initial =
+    userData.name && userData.name !== "Loading..."
+      ? userData.name.charAt(0).toUpperCase()
+      : "U";
 
   return (
     <aside
@@ -118,20 +120,34 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* Bagian Bawah: Profile & Logout Dinamis */}
-      <div className="pt-4 border-t border-slate-800">
-        {!isCollapsed && (
-          <div className="flex items-center gap-3 p-3 rounded-md bg-slate-800 mb-3">
-            <div className="w-9 h-9 rounded-md bg-slate-700 flex items-center justify-center font-bold text-cyan-400 shrink-0">
-              {initial}
-            </div>
-            <div className="overflow-hidden">
-              <div className="font-medium text-xs text-slate-200 truncate">{userEmail}</div>
-              <div className="text-[10px] text-slate-400 truncate">Administrator</div>
-            </div>
+      {/* Bagian Bawah: Profile & Logout */}
+      <div className="pt-4 border-t border-slate-800 space-y-3">
+        {/* Box Profil */}
+        <div
+          className={`flex items-center gap-3 p-3 rounded-md bg-slate-800 transition-all ${
+            isCollapsed ? "justify-center" : ""
+          }`}
+          title={isCollapsed ? `${userData.name}\n${userData.email}` : undefined}
+        >
+          <div className="w-9 h-9 rounded-md bg-slate-700 flex items-center justify-center font-bold text-cyan-400 shrink-0">
+            {initial}
           </div>
-        )}
 
+          {!isCollapsed && (
+            <div className="overflow-hidden">
+              {/* Nama Lengkap di Atas */}
+              <div className="font-bold text-xs text-slate-100 truncate">
+                {userData.name}
+              </div>
+              {/* Email di Bawah */}
+              <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                {userData.email}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tombol Logout */}
         <button
           onClick={handleLogout}
           aria-label="Logout"
