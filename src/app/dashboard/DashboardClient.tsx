@@ -44,6 +44,13 @@ interface KasSummaryType {
   error: string | null;
 }
 
+interface EventItem {
+  id: number | string;
+  title: string;
+  date_description: string; // contoh: "Setiap Kamis Malam • Ba'da Isya" atau "12 Oktober 2026"
+  category?: string; // contoh: "Rutin", "Khusus", "Haul"
+}
+
 export default function DashboardClient({ user }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<"transparansi" | "yasin" | "sholat" | "haul">("transparansi");
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
@@ -56,6 +63,11 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     loading: true,
     error: null
   });
+
+  // State Data - Agenda / Acara (REAL DATA dari API)
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
+  const [errorEvents, setErrorEvents] = useState<string | null>(null);
 
   // State Real API - Yasin
   const [yasinAyahs, setYasinAyahs] = useState<Ayah[]>([]);
@@ -100,6 +112,26 @@ export default function DashboardClient({ user }: DashboardClientProps) {
         loading: false,
         error: err.message || 'Gagal memuat data kas'
       }));
+    }
+  }, []);
+
+  // Fetch Real Data Agenda / Acara
+  const fetchEvents = useCallback(async () => {
+    setLoadingEvents(true);
+    setErrorEvents(null);
+    try {
+      const res = await fetch('/api/events'); // Sesuaikan endpoint API acara Anda (misal: /api/acara)
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+      const data = await res.json();
+      // Asumsi API mengembalikan array data acara [{ id, title, date_description, category }]
+      setEvents(Array.isArray(data) ? data : data.events || []);
+    } catch (err: any) {
+      console.error('❌ Gagal mengambil data acara:', err);
+      setErrorEvents(err.message || 'Gagal memuat agenda acara');
+    } finally {
+      setLoadingEvents(false);
     }
   }, []);
 
@@ -161,6 +193,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
 
   useEffect(() => {
     fetchKasSummary();
+    fetchEvents();
     
     if (activeTab === "yasin" && yasinAyahs.length === 0) {
       fetchYasin();
@@ -168,7 +201,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     if (activeTab === "sholat") {
       fetchJadwalAladhan(selectedCity);
     }
-  }, [activeTab, fetchYasin, fetchJadwalAladhan, fetchKasSummary, selectedCity, yasinAyahs.length]);
+  }, [activeTab, fetchYasin, fetchJadwalAladhan, fetchKasSummary, fetchEvents, selectedCity, yasinAyahs.length]);
 
   const handleCitySearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +318,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       {/* MAIN CONTENT AREA */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
         
-        {/* TAB 1: TRANSPARANSI KAS */}
+        {/* TAB 1: TRANSPARANSI KAS & AGENDA */}
         {activeTab === "transparansi" && (
           <div className="space-y-6">
             {kasSummary.loading ? (
@@ -342,17 +375,50 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                   </div>
                 </div>
 
+                {/* AGENDA KEGIATAN DYNAMIC */}
                 <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Calendar className="text-emerald-400" size={20} /> Agenda Kegiatan Terdekat
-                  </h3>
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <div>
-                      <h4 className="font-semibold text-white">Yasinan & Tahlil Malam Jumat</h4>
-                      <p className="text-xs text-slate-400">Setiap Kamis Malam • Ba'da Isya</p>
-                    </div>
-                    <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Rutin</span>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Calendar className="text-emerald-400" size={20} /> Agenda Kegiatan Terdekat
+                    </h3>
+                    <button 
+                      onClick={fetchEvents}
+                      className="p-1.5 text-slate-400 hover:text-white transition"
+                      title="Refresh Acara"
+                    >
+                      <RefreshCw size={14} className={loadingEvents ? "animate-spin" : ""} />
+                    </button>
                   </div>
+
+                  {loadingEvents ? (
+                    <div className="flex justify-center items-center py-6 text-slate-400 gap-2">
+                      <Loader2 className="animate-spin text-emerald-500" size={20} />
+                      <span className="text-sm">Memuat agenda acara...</span>
+                    </div>
+                  ) : errorEvents ? (
+                    <p className="text-sm text-rose-400 py-2">{errorEvents}</p>
+                  ) : events.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic py-2">Belum ada agenda kegiatan terdekat.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {events.map((event) => (
+                        <div 
+                          key={event.id}
+                          className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+                        >
+                          <div>
+                            <h4 className="font-semibold text-white">{event.title}</h4>
+                            <p className="text-xs text-slate-400">{event.date_description}</p>
+                          </div>
+                          {event.category && (
+                            <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              {event.category}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
