@@ -1,89 +1,60 @@
 import { executeQuery } from '../pool';
 
-export interface TransactionDTO {
+export interface TransactionData {
+  id: number;
+  title: string;
   amount: number;
-  accountId?: string | number;
   type: string;
-  category?: string;
-  notes?: string;
-  title?: string;
-  description?: string;
-  date?: string;
-  userId?: string | number;
-  [key: string]: any;
+  category: string;
+  transactionDate: Date;
 }
 
-export async function createTransaction(payload: TransactionDTO) {
-  try {
-    const rawId = 'TRX-' + Date.now();
-    const notesContent = payload.notes || payload.title || payload.description || '';
-    const transactionDate = payload.date || new Date().toISOString().split('T')[0];
+export async function updateTransaction(data: TransactionData) {
+  // Query SQL UPDATE dengan penanganan format DATE Oracle yang aman
+  const sql = `
+    UPDATE TRANSACTIONS
+    SET 
+      TITLE = :title,
+      AMOUNT = :amount,
+      TYPE = :type,
+      CATEGORY = :category,
+      TRANSACTION_DATE = :transactionDate
+    WHERE ID = :id
+  `;
 
-    // 1. Ambil User ID yang benar-benar ada di tabel USERS
-    let validUserId: any = payload.userId;
-    if (!validUserId || validUserId === 'USER-001') {
-      const userRes: any = await executeQuery(`SELECT id FROM users WHERE ROWNUM <= 1`);
-      if (userRes?.rows?.[0]) {
-        validUserId = userRes.rows[0].ID ?? userRes.rows[0].id;
-      } else {
-        validUserId = 1; // Fallback jika tabel users ber-ID angka
-      }
-    }
+  const binds = {
+    title: String(data.title),
+    amount: Number(data.amount), // Memastikan tipe number
+    type: String(data.type),
+    category: String(data.category),
+    transactionDate: data.transactionDate,
+    id: Number(data.id) // Memastikan tipe number
+  };
 
-    // 2. Ambil Account ID yang benar-benar ada di tabel ACCOUNTS
-    let validAccountId: any = payload.accountId;
-    if (!validAccountId || validAccountId === 'DEFAULT_ACCOUNT' || validAccountId === 'ACC-DEFAULT') {
-      const accRes: any = await executeQuery(`SELECT id FROM accounts WHERE ROWNUM <= 1`);
-      
-      if (accRes?.rows?.[0]) {
-        validAccountId = accRes.rows[0].ID ?? accRes.rows[0].id;
-      } else {
-        // Jika tabel accounts masih kosong, buat akun default dengan ID angka/unik
-        const newAccId = Date.now(); 
-        await executeQuery(
-          `INSERT INTO accounts (id, name, type, balance, user_id) VALUES (:id, :name, :type, :balance, :userId)`,
-          { id: newAccId, name: 'Kas Utama', type: 'CASH', balance: 0, userId: validUserId }
-        );
-        validAccountId = newAccId;
-      }
-    }
+  const result = await executeQuery(sql, binds, { autoCommit: true });
+  return result;
+}
 
-    // 3. Eksekusi Insert Transaksi dengan data yang dijamin tidak NULL
-    const sql = `
-      INSERT INTO transactions (
-        id,
-        user_id, 
-        account_id, 
-        type, 
-        amount, 
-        notes, 
-        transaction_date
-      ) VALUES (
-        :id,
-        :userId, 
-        :accountId, 
-        :type, 
-        :amount, 
-        :notes, 
-        TO_DATE(:transactionDate, 'YYYY-MM-DD')
-      )
-    `;
+export async function deleteTransaction(id: number) {
+  const sql = `DELETE FROM TRANSACTIONS WHERE ID = :id`;
+  const binds = { id: Number(id) };
 
-    const binds = {
-      id: rawId,
-      userId: validUserId,
-      accountId: validAccountId,
-      type: payload.type || 'INCOME',
-      amount: Number(payload.amount),
-      notes: notesContent,
-      transactionDate: transactionDate,
-    };
+  return await executeQuery(sql, binds, { autoCommit: true });
+}
 
-    const result = await executeQuery(sql, binds);
-    return result;
+export async function getTransactions(options: { limit: number; offset: number }) {
+  const sql = `
+    SELECT ID, TITLE, AMOUNT, TYPE, CATEGORY, TRANSACTION_DATE
+    FROM TRANSACTIONS
+    ORDER BY TRANSACTION_DATE DESC
+    OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
+  `;
 
-  } catch (err: any) {
-    console.error('❌ CRITICAL TRANSACTION ERROR:', err?.message);
-    throw new Error(err?.message || 'Gagal menyimpan transaksi ke Oracle DB');
-  }
+  const binds = {
+    offset: Number(options.offset),
+    limit: Number(options.limit)
+  };
+
+  const result = await executeQuery(sql, binds);
+  return result.rows;
 }
