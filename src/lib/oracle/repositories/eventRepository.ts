@@ -25,15 +25,43 @@ export async function getAllEvents() {
   return (result?.rows || []) as EventRecord[];
 }
 
-export async function createEvent(data: { title: string; startDate: string; endDate?: string; location: string }) {
+export async function createEvent(data: { 
+  title: string; 
+  startDate: string; 
+  endDate?: string; 
+  location: string;
+  createdBy?: string; // Tambahkan opsional createdBy
+}) {
   const id = Date.now().toString();
+  // Gunakan ID user login atau fallback ke 'ADMIN'
+  const createdBy = data.createdBy || 'ADMIN'; 
+
   const sql = `
-    INSERT INTO EVENTS (ID, TITLE, START_DATE, END_DATE, LOCATION, STATUS, CREATED_AT)
-    VALUES (:id, :title, TO_DATE(:startDate, 'YYYY-MM-DD"T"HH24:MI'), TO_DATE(:endDate, 'YYYY-MM-DD"T"HH24:MI'), :location, 'SCHEDULED', SYSDATE)
+    INSERT INTO EVENTS (
+      ID, 
+      CREATED_BY, 
+      TITLE, 
+      START_DATE, 
+      END_DATE, 
+      LOCATION, 
+      STATUS, 
+      CREATED_AT
+    )
+    VALUES (
+      :id, 
+      :createdBy, 
+      :title, 
+      TO_DATE(:startDate, 'YYYY-MM-DD"T"HH24:MI'), 
+      TO_DATE(:endDate, 'YYYY-MM-DD"T"HH24:MI'), 
+      :location, 
+      'SCHEDULED', 
+      SYSDATE
+    )
   `;
   
   await executeQuery(sql, {
     id,
+    createdBy,
     title: data.title,
     startDate: data.startDate,
     endDate: data.endDate || data.startDate,
