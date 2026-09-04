@@ -16,6 +16,16 @@ import {
 // ==========================================
 // INTERFACES & TYPES
 // ==========================================
+interface UserProps {
+  id?: any;
+  email?: any;
+  name?: any;
+}
+
+interface DashboardClientProps {
+  user?: UserProps;
+}
+
 interface AcaraItem {
   id: number | string;
   judul: string;
@@ -58,7 +68,7 @@ interface Timings {
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
-export default function DashboardClient() {
+export default function DashboardClient({ user }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<string>("transparansi");
 
   // State Kas
@@ -198,7 +208,7 @@ export default function DashboardClient() {
               Dashboard Keuangan & Agenda
             </h1>
             <p className="text-sm text-slate-400 mt-1">
-              Sistem Informasi & Layanan Informasi Publik
+              {user?.name ? `Selamat datang, ${user.name}` : "Sistem Informasi & Layanan Informasi Publik"}
             </p>
           </div>
 
