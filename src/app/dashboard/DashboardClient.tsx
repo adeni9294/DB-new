@@ -1,54 +1,29 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import {
-  Compass,
-  Volume2,
-  VolumeX,
-  RefreshCw,
-  Search,
-  BookOpen,
-  MapPin,
-  Calendar,
-  Clock,
-  DollarSign,
-  ChevronRight,
-  TrendingUp,
-  TrendingDown,
-  Info,
+import React, { useState, useEffect, useCallback } from "react";
+import { 
+  Wallet, ArrowUpRight, ArrowDownRight, Calendar, MapPin, 
+  BookOpen, Compass, Clock, LogIn, Sparkles, Navigation,
+  Loader2, RefreshCw, Volume2, Search, AlertCircle
 } from "lucide-react";
 
-// --- TypeScript Interfaces ---
-interface Ayah {
-  number: {
-    inSurah: number;
-  };
-  text: {
-    ar: string;
-    read: string;
-  };
-  translation: {
-    id: string;
-  };
-  audio: {
-    primary: string;
-  };
+type UserType = {
+  id?: number | string;
+  email?: string;
+  name?: string;
+  role?: string;
+};
+
+interface DashboardClientProps {
+  user?: UserType;
 }
 
-interface SurahData {
-  number: number;
-  name: {
-    short: string;
-    long: string;
-    transliteration: {
-      id: string;
-    };
-    translation: {
-      id: string;
-    };
-  };
-  numberOfVerses: number;
-  verses: Ayah[];
+interface Ayah {
+  nomorAyat: number;
+  teksArab: string;
+  teksLatin: string;
+  teksIndonesia: string;
+  audio?: { [key: string]: string };
 }
 
 interface JadwalSholatAladhan {
@@ -57,532 +32,629 @@ interface JadwalSholatAladhan {
   Asr: string;
   Maghrib: string;
   Isha: string;
+  Imsak: string;
+  ReadableDate: string;
 }
 
 interface KasSummaryType {
-  pemasukan: number;
-  pengeluaran: number;
-  saldo: number;
+  totalSaldo: number;
+  pemasukanBulanIni: number;
+  pengeluaranBulanIni: number;
+  loading: boolean;
+  error: string | null;
 }
 
 interface EventItem {
-  id: string | number;
-  title: string;
-  date: string;
-  time?: string;
+  id?: number | string;
+  ID?: number | string;
+  NAMA_ACARA?: string;
+  title?: string;
+  WAKTU_MULAI?: string;
+  WAKTU_SELESAI?: string;
+  date_description?: string;
+  LOKASI?: string;
   location?: string;
-  description?: string;
+  KATEGORI?: string;
+  category?: string;
 }
 
-export default function DashboardClient() {
-  // --- States ---
-  const [activeTab, setActiveTab] = useState<"jadwal" | "quran" | "kompas" | "kas" | "agenda">("jadwal");
+export default function DashboardClient({ user }: DashboardClientProps) {
+  const [activeTab, setActiveTab] = useState<"transparansi" | "yasin" | "sholat" | "haul">("transparansi");
+  const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
 
-  // Quran State
-  const [surahList, setSurahList] = useState<any[]>([]);
-  const [selectedSurahNo, setSelectedSurahNo] = useState<number>(1);
-  const [surahData, setSurahData] = useState<SurahData | null>(null);
-  const [loadingQuran, setLoadingQuran] = useState<boolean>(false);
+  // State Data - Transparansi Kas (REAL DATA dari Oracle DB)
+  const [kasSummary, setKasSummary] = useState<KasSummaryType>({
+    totalSaldo: 0,
+    pemasukanBulanIni: 0,
+    pengeluaranBulanIni: 0,
+    loading: true,
+    error: null
+  });
+
+  // State Data - Agenda / Acara (REAL DATA dari API Acara)
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
+  const [errorEvents, setErrorEvents] = useState<string | null>(null);
+
+  // State Real API - Yasin
+  const [yasinAyahs, setYasinAyahs] = useState<Ayah[]>([]);
+  const [loadingYasin, setLoadingYasin] = useState<boolean>(false);
+  const [errorYasin, setErrorYasin] = useState<string | null>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Audio Reference (Mencegah Memory Leak)
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  // State Real API Aladhan - Jadwal Sholat
+  const [jadwalSholat, setJadwalSholat] = useState<JadwalSholatAladhan | null>(null);
+  const [cityInput, setCityInput] = useState<string>("Jakarta");
+  const [selectedCity, setSelectedCity] = useState<string>("Jakarta");
+  const [loadingSholat, setLoadingSholat] = useState<boolean>(false);
+  const [errorSholat, setErrorSholat] = useState<string | null>(null);
 
-  // Compass State
-  const [heading, setHeading] = useState<number>(0);
+  // State Kompas Kiblat Real Sensor
+  const [heading, setHeading] = useState<number | null>(null);
   const [kompasActive, setKompasActive] = useState<boolean>(false);
 
-  // Location & Prayer Time State
-  const [locationName, setLocationName] = useState<string>("Mencari lokasi...");
-  const [jadwalSholat, setJadwalSholat] = useState<JadwalSholatAladhan | null>(null);
-  const [nextPrayer, setNextPrayer] = useState<{ name: string; time: string; countdown: string } | null>(null);
-
-  // Financial & Agenda State
-  const [kasSummary, setKasSummary] = useState<KasSummaryType>({ pemasukan: 0, pengeluaran: 0, saldo: 0 });
-  const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
-
-  // --- Fetch Surah List ---
-  useEffect(() => {
-    fetch("https://equran.id/api/v2/surat")
-      ? fetch("https://equran.id/api/v2/surat")
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.code === 200) setSurahList(data.data);
-          })
-          .catch((err) => console.error("Error fetching surah list:", err))
-      : null;
-  }, []);
-
-  // --- Fetch Selected Surah Details ---
-  useEffect(() => {
-    if (!selectedSurahNo) return;
-    setLoadingQuran(true);
-    fetch(`https://equran.id/api/v2/surat/${selectedSurahNo}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.code === 200) {
-          setSurahData(data.data);
-        }
-      })
-      .catch((err) => console.error("Error fetching surah data:", err))
-      .finally(() => setLoadingQuran(false));
-  }, [selectedSurahNo]);
-
-  // --- Fetch Prayer Times & Location ---
-  const fetchPrayerTimes = useCallback((latitude: number, longitude: number) => {
-    fetch(`https://api.aladhan.com/v1/timings?latitude=${latitude}&longitude=${longitude}&method=11`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.code === 200) {
-          const timings = data.data.timings;
-          setJadwalSholat({
-            Fajr: timings.Fajr,
-            Dhuhr: timings.Dhuhr,
-            Asr: timings.Asr,
-            Maghrib: timings.Maghrib,
-            Isha: timings.Isha,
-          });
-        }
-      })
-      .catch((err) => console.error("Error fetching prayer times:", err));
-
-    // Reverse Geocoding
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const city = data.address.city || data.address.town || data.address.suburb || "Lokasi Anda";
-        setLocationName(city);
-      })
-      .catch(() => setLocationName("Lokasi Terdeteksi"));
-  }, []);
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => fetchPrayerTimes(pos.coords.latitude, pos.coords.longitude),
-        () => {
-          setLocationName("Jakarta (Default)");
-          fetchPrayerTimes(-6.2088, 106.8456); // Fallback ke Jakarta
-        }
-      );
-    } else {
-      setLocationName("Jakarta (Default)");
-      fetchPrayerTimes(-6.2088, 106.8456);
+  // Fetch Real Data Kas Summary dari Oracle DB via API
+  const fetchKasSummary = useCallback(async () => {
+    setKasSummary(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const res = await fetch('/api/dashboard/summary');
+      
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      setKasSummary({
+        totalSaldo: data.totalSaldo || 0,
+        pemasukanBulanIni: data.pemasukanBulanIni || 0,
+        pengeluaranBulanIni: data.pengeluaranBulanIni || 0,
+        loading: false,
+        error: null
+      });
+    } catch (err: any) {
+      console.error('❌ Gagal mengambil kas summary:', err);
+      setKasSummary(prev => ({
+        ...prev,
+        loading: false,
+        error: err.message || 'Gagal memuat data kas'
+      }));
     }
-  }, [fetchPrayerTimes]);
-
-  // --- Fetch Kas & Agenda Internal ---
-  useEffect(() => {
-    fetch("/api/kas/summary")
-      .then((res) => res.json())
-      .then((data) => setKasSummary(data))
-      .catch(() => setKasSummary({ pemasukan: 15000000, pengeluaran: 4500000, saldo: 10500000 }));
-
-    fetch("/api/events/upcoming")
-      .then((res) => res.json())
-      .then((result) => setUpcomingEvents(result.data || result.events || []))
-      .catch(() =>
-        setUpcomingEvents([
-          { id: 1, title: "Kajian Subuh Bersama Ust. Ahmad", date: "2026-04-20", time: "04:30 WIB", location: "Ruang Utama" },
-          { id: 2, title: "Santunan Anak Yatim Bulanan", date: "2026-04-25", time: "16:00 WIB", location: "Aula Masjid" },
-        ])
-      );
   }, []);
 
-  // --- Audio Player Handlers ---
+  // Fetch Real Data Agenda / Acara dari endpoint /api/acara
+  const fetchEvents = useCallback(async () => {
+    setLoadingEvents(true);
+    setErrorEvents(null);
+    try {
+      const res = await fetch('/api/acara');
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+      const result = await res.json();
+      
+      // Menangani berbagai format return API (Array langsung / { data: [] } / { events: [] } / { acara: [] })
+      const rawData = Array.isArray(result) 
+        ? result 
+        : result.data || result.events || result.acara || [];
+
+      setEvents(rawData);
+    } catch (err: any) {
+      console.error('❌ Gagal mengambil data acara:', err);
+      setErrorEvents(err.message || 'Gagal memuat agenda acara');
+    } fontally {
+      setLoadingEvents(false);
+    }
+  }, []);
+
+  // 1. Fetch Real Data Surah Yasin (Surah No. 36)
+  const fetchYasin = useCallback(async () => {
+    setLoadingYasin(true);
+    setErrorYasin(null);
+    try {
+      const res = await fetch("https://equran.id/api/v2/surat/36");
+      const json = await res.json();
+      if (json.code === 200 && json.data?.ayat) {
+        setYasinAyahs(json.data.ayat);
+      } else {
+        throw new Error("Gagal mengambil data Yasin");
+      }
+    } catch (err: any) {
+      setErrorYasin(err.message || "Terjadi kesalahan saat memuat Yasin");
+    } finally {
+      setLoadingYasin(false);
+    }
+  }, []);
+
+  // 2. Fetch Real Data Jadwal Sholat dari ALADHAN API (Method 20 = Kemenag RI)
+  const fetchJadwalAladhan = useCallback(async (kota: string) => {
+    setLoadingSholat(true);
+    setErrorSholat(null);
+    try {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, "0");
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const yyyy = today.getFullYear();
+      const dateStr = `${dd}-${mm}-${yyyy}`;
+
+      const res = await fetch(
+        `https://api.aladhan.com/v1/timingsByCity/${dateStr}?city=${encodeURIComponent(kota)}&country=Indonesia&method=20`
+      );
+      const json = await res.json();
+
+      if (json.code === 200 && json.data?.timings) {
+        const timings = json.data.timings;
+        setJadwalSholat({
+          Fajr: timings.Fajr,
+          Dhuhr: timings.Dhuhr,
+          Asr: timings.Asr,
+          Maghrib: timings.Maghrib,
+          Isha: timings.Isha,
+          Imsak: timings.Imsak,
+          ReadableDate: json.data.date.readable,
+        });
+      } else {
+        throw new Error("Kota tidak ditemukan atau API bermasalah.");
+      }
+    } catch (err: any) {
+      setErrorSholat(err.message || "Gagal memuat jadwal sholat Aladhan.");
+    } finally {
+      setLoadingSholat(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchKasSummary();
+    fetchEvents();
+    
+    if (activeTab === "yasin" && yasinAyahs.length === 0) {
+      fetchYasin();
+    }
+    if (activeTab === "sholat") {
+      fetchJadwalAladhan(selectedCity);
+    }
+  }, [activeTab, fetchYasin, fetchJadwalAladhan, fetchKasSummary, fetchEvents, selectedCity, yasinAyahs.length]);
+
+  const handleCitySearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cityInput.trim()) {
+      setSelectedCity(cityInput.trim());
+    }
+  };
+
+  // Handler Kompas Kiblat Sensor Device
+  const startCompass = () => {
+    if (typeof window !== "undefined" && "DeviceOrientationEvent" in window) {
+      window.addEventListener("deviceorientation", (e) => {
+        if (e.alpha !== null) {
+          setHeading(Math.round(e.alpha));
+          setKompasActive(true);
+        }
+      });
+    } else {
+      alert("Fitur kompas tidak didukung di perangkat ini.");
+    }
+  };
+
   const playAudio = (url?: string) => {
     if (!url) return;
-
-    // Hentikan audio yang sedang berjalan
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current.currentTime = 0;
-    }
-
-    // Toggle off jika mengklik audio yang sama
-    if (playingAudio === url) {
-      setPlayingAudio(null);
-      return;
-    }
-
     const audio = new Audio(url);
-    currentAudioRef.current = audio;
     setPlayingAudio(url);
-
-    audio.play().catch((err) => console.error("Gagal memutar audio:", err));
-    audio.onended = () => {
-      setPlayingAudio(null);
-      currentAudioRef.current = null;
-    };
+    audio.play();
+    audio.onended = () => setPlayingAudio(null);
   };
-
-  // --- Compass Handlers (iOS & Android Compatible) ---
-  const handleOrientation = useCallback((e: DeviceOrientationEvent) => {
-    if (e.alpha !== null) {
-      setHeading(Math.round(e.alpha));
-      setKompasActive(true);
-    }
-  }, []);
-
-  const startCompass = async () => {
-    if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) {
-      alert("Fitur kompas tidak didukung di perangkat ini.");
-      return;
-    }
-
-    // Penanganan khusus permission iOS (Safari)
-    const DeviceOrientationEventiOS = DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<"granted" | "denied">;
-    };
-
-    if (typeof DeviceOrientationEventiOS.requestPermission === "function") {
-      try {
-        const response = await DeviceOrientationEventiOS.requestPermission();
-        if (response === "granted") {
-          window.addEventListener("deviceorientation", handleOrientation);
-        } else {
-          alert("Izin akses sensor kompas ditolak.");
-        }
-      } catch (error) {
-        console.error("Gagal meminta izin kompas:", error);
-      }
-    } else {
-      // Browser Standar / Android
-      window.addEventListener("deviceorientation", handleOrientation);
-    }
-  };
-
-  // Cleanup compass listener
-  useEffect(() => {
-    return () => {
-      window.removeEventListener("deviceorientation", handleOrientation);
-    };
-  }, [handleOrientation]);
-
-  // Filter surah
-  const filteredSurahList = surahList.filter(
-    (s) =>
-      s.namaLatin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.arti.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.nomor.toString().includes(searchQuery)
-  );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-12">
-      {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <BookOpen className="w-5 h-5" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* HEADER */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-emerald-900/40">
+              K&B
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-tight text-white">Islamic Portal</h1>
-              <div className="flex items-center text-xs text-slate-400 mt-0.5">
-                <MapPin className="w-3 h-3 mr-1 text-emerald-400" />
-                <span>{locationName}</span>
-              </div>
+              <h1 className="font-bold text-base sm:text-lg leading-tight text-white">Portal K&B</h1>
+              <p className="text-xs text-emerald-400">Transparansi & Layanan Publik</p>
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <nav className="hidden md:flex space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-            {[
-              { id: "jadwal", label: "Jadwal Sholat", icon: Clock },
-              { id: "quran", label: "Al-Qur'an", icon: BookOpen },
-              { id: "kompas", label: "Arah Qiblat", icon: Compass },
-              { id: "kas", label: "Kas Masjid", icon: DollarSign },
-              { id: "agenda", label: "Agenda", icon: Calendar },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === tab.id
-                      ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+          <a 
+            href={user ? "/dashboard" : "/login"} 
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium border border-slate-700 transition"
+          >
+            <LogIn size={16} />
+            <span>{user ? `Halo, ${user.name || 'Pengurus'}` : "Login Pengurus"}</span>
+          </a>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-6xl mx-auto px-4 pt-6">
-        {/* Mobile Tab Selector */}
-        <div className="flex md:hidden overflow-x-auto space-x-2 pb-4 mb-4 scrollbar-none">
-          {[
-            { id: "jadwal", label: "Jadwal", icon: Clock },
-            { id: "quran", label: "Qur'an", icon: BookOpen },
-            { id: "kompas", label: "Qiblat", icon: Compass },
-            { id: "kas", label: "Kas", icon: DollarSign },
-            { id: "agenda", label: "Agenda", icon: Calendar },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap border ${
-                  activeTab === tab.id
-                    ? "bg-emerald-500 text-slate-950 border-emerald-400 font-semibold"
-                    : "bg-slate-900 text-slate-400 border-slate-800"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* HERO BANNER & TABS */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-950/40 via-slate-950 to-slate-950 py-10 px-4 sm:px-6 lg:px-8 border-b border-slate-800/60">
+        <div className="max-w-4xl mx-auto text-center space-y-4">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Sparkles size={14} /> Selamat Datang Warga & Jemaah
+          </span>
+          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
+            Portal Informasi & Layanan Keagamaan
+          </h2>
+          <p className="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
+            Wadah transparansi kas organisasi, bacaan Yasin digital, jadwal sholat otomatis Aladhan, serta informasi kegiatan warga.
+          </p>
 
-        {/* --- TAB 1: JADWAL SHOLAT --- */}
-        {activeTab === "jadwal" && (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-500/20 rounded-2xl p-6 relative overflow-hidden">
-              <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-emerald-500/5 blur-3xl pointer-events-none" />
-              <div className="relative z-10">
-                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                  Hari Ini
-                </span>
-                <h2 className="text-2xl font-bold text-white mt-3">Waktu Sholat & Ibadah</h2>
-                <p className="text-sm text-slate-400 mt-1">
-                  Jadwal berdasarkan koordinat lokasi terkini ({locationName}).
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {jadwalSholat ? (
-                Object.entries(jadwalSholat).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="bg-slate-900 border border-slate-800 hover:border-emerald-500/30 transition-all rounded-xl p-4 flex flex-col items-center justify-center text-center group"
-                  >
-                    <span className="text-xs uppercase text-slate-400 group-hover:text-emerald-400 transition-colors">
-                      {key}
-                    </span>
-                    <span className="text-xl font-bold text-white mt-1">{value}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full text-center py-8 text-slate-500">
-                  Memuat jadwal sholat...
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB 2: AL-QUR'AN --- */}
-        {activeTab === "quran" && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Sidebar Daftar Surah */}
-            <div className="md:col-span-4 space-y-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-500" />
-                <input
-                  type="text"
-                  placeholder="Cari Surah..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-h-[600px] overflow-y-auto divide-y divide-slate-800/50">
-                {filteredSurahList.map((surah) => (
-                  <button
-                    key={surah.nomor}
-                    onClick={() => setSelectedSurahNo(surah.nomor)}
-                    className={`w-full p-3.5 text-left flex items-center justify-between transition-colors ${
-                      selectedSurahNo === surah.nomor
-                        ? "bg-emerald-500/10 text-emerald-400 border-l-4 border-emerald-500"
-                        : "hover:bg-slate-800/40 text-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="w-7 h-7 rounded-lg bg-slate-800 text-xs flex items-center justify-center text-slate-400 font-medium">
-                        {surah.nomor}
-                      </span>
-                      <div>
-                        <div className="text-sm font-semibold">{surah.namaLatin}</div>
-                        <div className="text-xs text-slate-500">{surah.arti}</div>
-                      </div>
-                    </div>
-                    <span className="text-right text-xs font-arabic text-slate-400">
-                      {surah.nama}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Content Detail Surah */}
-            <div className="md:col-span-8">
-              {loadingQuran ? (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">
-                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-400" />
-                  Memuat ayat-ayat Al-Qur'an...
-                </div>
-              ) : surahData ? (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-                  <div className="border-b border-slate-800 pb-4 text-center">
-                    <h2 className="text-2xl font-bold text-white">{surahData.name.transliteration.id}</h2>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {surahData.name.translation.id} • {surahData.numberOfVerses} Ayat
-                    </p>
-                  </div>
-
-                  <div className="space-y-6 divide-y divide-slate-800/60">
-                    {surahData.verses?.map((ayah) => (
-                      <div key={ayah.number.inSurah} className="pt-6 first:pt-0 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">
-                            {ayah.number.inSurah}
-                          </span>
-                          <button
-                            onClick={() => playAudio(ayah.audio?.primary)}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                          >
-                            {playingAudio === ayah.audio?.primary ? (
-                              <VolumeX className="w-4 h-4 text-emerald-400 animate-pulse" />
-                            ) : (
-                              <Volume2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                        <div className="text-right text-2xl font-arabic leading-loose text-white pt-2">
-                          {ayah.text.ar}
-                        </div>
-                        <div className="text-sm text-slate-400 leading-relaxed font-light">
-                          {ayah.translation.id}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">
-                  Pilih surah untuk mulai membaca.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB 3: KOMPAS QIBLAT --- */}
-        {activeTab === "kompas" && (
-          <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Kompas Arah Qiblat</h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Gunakan sensor orientasi perangkat Anda untuk menentukan arah Kiblat.
-              </p>
-            </div>
-
-            <div className="relative w-48 h-48 mx-auto flex items-center justify-center border-4 border-slate-800 rounded-full bg-slate-950 shadow-inner">
-              <div
-                className="w-full h-full absolute flex items-center justify-center transition-transform duration-200"
-                style={{ transform: `rotate(${-heading}deg)` }}
-              >
-                <div className="w-1 h-20 bg-emerald-500 rounded-full origin-bottom transform -translate-y-10" />
-              </div>
-              <div className="text-center z-10 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
-                <span className="text-2xl font-bold text-white">{heading}°</span>
-              </div>
-            </div>
-
+          <div className="pt-4 flex flex-wrap justify-center gap-2">
             <button
-              onClick={startCompass}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+              onClick={() => setActiveTab("transparansi")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                activeTab === "transparansi" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
             >
-              {kompasActive ? "Kompas Aktif" : "Aktifkan Kompas"}
+              <Wallet size={16} /> Transparansi Kas
+            </button>
+            <button
+              onClick={() => setActiveTab("yasin")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                activeTab === "yasin" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <BookOpen size={16} /> Yasin & Audio
+            </button>
+            <button
+              onClick={() => setActiveTab("sholat")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                activeTab === "sholat" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <Clock size={16} /> Sholat & Kiblat
+            </button>
+            <button
+              onClick={() => setActiveTab("haul")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer ${
+                activeTab === "haul" 
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30" 
+                  : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800"
+              }`}
+            >
+              <MapPin size={16} /> Info Haul & Peta
             </button>
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* --- TAB 4: KAS MASJID --- */}
-        {activeTab === "kas" && (
+      {/* MAIN CONTENT AREA */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+        
+        {/* TAB 1: TRANSPARANSI KAS & AGENDA */}
+        {activeTab === "transparansi" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                <div className="flex items-center justify-between text-slate-400 mb-2">
-                  <span className="text-xs uppercase tracking-wider font-semibold">Total Pemasukan</span>
-                  <TrendingUp className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div className="text-2xl font-bold text-white">
-                  Rp {kasSummary.pemasukan.toLocaleString("id-ID")}
-                </div>
+            {kasSummary.loading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="animate-spin text-emerald-500" size={32} />
               </div>
+            ) : kasSummary.error ? (
+              <div className="p-4 bg-rose-950/40 border border-rose-800 text-rose-300 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={20} />
+                  <span className="text-sm">{kasSummary.error}</span>
+                </div>
+                <button 
+                  onClick={fetchKasSummary} 
+                  className="p-2 bg-rose-800 rounded-lg hover:bg-rose-700 transition"
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                    <div className="flex justify-between items-center text-slate-400 mb-2">
+                      <span className="text-sm font-medium">Sisa Kas Utama</span>
+                      <Wallet size={20} className="text-emerald-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-white">
+                      Rp {kasSummary.totalSaldo.toLocaleString("id-ID")}
+                    </p>
+                    <span className="text-xs text-emerald-400 mt-2 inline-block">Terverifikasi Oracle DB</span>
+                  </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-                <div className="flex items-center justify-between text-slate-400 mb-2">
-                  <span className="text-xs uppercase tracking-wider font-semibold">Total Pengeluaran</span>
-                  <TrendingDown className="w-4 h-4 text-rose-400" />
-                </div>
-                <div className="text-2xl font-bold text-white">
-                  Rp {kasSummary.pengeluaran.toLocaleString("id-ID")}
-                </div>
-              </div>
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                    <div className="flex justify-between items-center text-slate-400 mb-2">
+                      <span className="text-sm font-medium">Pemasukan Bulan Ini</span>
+                      <ArrowUpRight size={20} className="text-emerald-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-emerald-400">
+                      + Rp {kasSummary.pemasukanBulanIni.toLocaleString("id-ID")}
+                    </p>
+                    <span className="text-xs text-slate-500 mt-2 inline-block">Total Kas Masuk</span>
+                  </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 bg-gradient-to-br from-emerald-950/30 to-slate-900 border-emerald-500/20">
-                <div className="flex items-center justify-between text-slate-400 mb-2">
-                  <span className="text-xs uppercase tracking-wider font-semibold text-emerald-400">Saldo Akhir</span>
-                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-sm">
+                    <div className="flex justify-between items-center text-slate-400 mb-2">
+                      <span className="text-sm font-medium">Pengeluaran Bulan Ini</span>
+                      <ArrowDownRight size={20} className="text-rose-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-rose-400">
+                      - Rp {kasSummary.pengeluaranBulanIni.toLocaleString("id-ID")}
+                    </p>
+                    <span className="text-xs text-slate-500 mt-2 inline-block">Total Kas Keluar</span>
+                  </div>
                 </div>
-                <div className="text-2xl font-bold text-emerald-400">
-                  Rp {kasSummary.saldo.toLocaleString("id-ID")}
+
+                {/* AGENDA KEGIATAN DYNAMIC */}
+                <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Calendar className="text-emerald-400" size={20} /> Agenda Kegiatan Terdekat
+                    </h3>
+                    <button 
+                      onClick={fetchEvents}
+                      className="p-1.5 text-slate-400 hover:text-white transition"
+                      title="Refresh Acara"
+                    >
+                      <RefreshCw size={14} className={loadingEvents ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+
+                  {loadingEvents ? (
+                    <div className="flex justify-center items-center py-6 text-slate-400 gap-2">
+                      <Loader2 className="animate-spin text-emerald-500" size={20} />
+                      <span className="text-sm">Memuat agenda acara...</span>
+                    </div>
+                  ) : errorEvents ? (
+                    <p className="text-sm text-rose-400 py-2">{errorEvents}</p>
+                  ) : events.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic py-2">Belum ada agenda kegiatan terdekat.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {events.map((event, index) => {
+                        // Fallback nama field dari database / API
+                        const namaAcara = event.NAMA_ACARA || event.title || "Acara Tanpa Nama";
+                        const waktu = event.WAKTU_MULAI 
+                          ? `${event.WAKTU_MULAI} ${event.WAKTU_SELESAI ? `- ${event.WAKTU_SELESAI}` : ''}`
+                          : event.date_description || "Waktu belum ditentukan";
+                        const lokasi = event.LOKASI || event.location;
+                        const kategori = event.KATEGORI || event.category;
+
+                        return (
+                          <div 
+                            key={event.id || event.ID || index}
+                            className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+                          >
+                            <div>
+                              <h4 className="font-semibold text-white">{namaAcara}</h4>
+                              <p className="text-xs text-slate-400 mt-1">
+                                ⏱️ {waktu} {lokasi ? `• 📍 ${lokasi}` : ''}
+                              </p>
+                            </div>
+                            {kategori && (
+                              <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                {kategori}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
 
-        {/* --- TAB 5: AGENDA --- */}
-        {activeTab === "agenda" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-white">Agenda & Kegiatan Mendaag</h2>
+        {/* TAB 2: SURAT YASIN */}
+        {activeTab === "yasin" && (
+          <div className="max-w-3xl mx-auto space-y-6">
+            <div className="flex items-center justify-between bg-slate-900/80 p-4 rounded-2xl border border-slate-800 sticky top-20 z-40">
+              <div className="flex items-center gap-2">
+                <BookOpen size={18} className="text-emerald-400" />
+                <span className="font-bold text-sm text-white">Surat Yasin (83 Ayat)</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <button onClick={() => setFontSize("sm")} className={`px-2.5 py-1 rounded-lg cursor-pointer ${fontSize === 'sm' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Kecil</button>
+                <button onClick={() => setFontSize("md")} className={`px-2.5 py-1 rounded-lg cursor-pointer ${fontSize === 'md' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sedang</button>
+                <button onClick={() => setFontSize("lg")} className={`px-2.5 py-1 rounded-lg cursor-pointer ${fontSize === 'lg' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Besar</button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {upcomingEvents.map((event) => (
-                <div key={event.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <h3 className="font-semibold text-white leading-snug">{event.title}</h3>
-                    <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap">
-                      {event.date}
+            {loadingYasin && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                <Loader2 className="animate-spin text-emerald-500" size={32} />
+                <p className="text-sm">Memuat Al-Qur'an (Surat Yasin)...</p>
+              </div>
+            )}
+
+            {errorYasin && (
+              <div className="p-4 bg-rose-950/40 border border-rose-800 text-rose-300 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={20} />
+                  <span>{errorYasin}</span>
+                </div>
+                <button onClick={fetchYasin} className="p-2 bg-rose-800 rounded-lg hover:bg-rose-700">
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+            )}
+
+            {!loadingYasin && yasinAyahs.map((ayat) => (
+              <div key={ayat.nomorAyat} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-full bg-emerald-950 border border-emerald-800/50 flex items-center justify-center text-xs font-bold text-emerald-400">
+                      {ayat.nomorAyat}
                     </span>
+                    {ayat.audio && (
+                      <button 
+                        onClick={() => playAudio(ayat.audio?.["05"] || ayat.audio?.["01"])}
+                        className={`p-2 rounded-full border transition cursor-pointer ${
+                          playingAudio === (ayat.audio?.["05"] || ayat.audio?.["01"]) 
+                            ? "bg-emerald-600 text-white border-emerald-500" 
+                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                        }`}
+                      >
+                        <Volume2 size={14} />
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-4 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
-                    {event.time && (
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{event.time}</span>
-                      </div>
-                    )}
-                    {event.location && (
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{event.location}</span>
-                      </div>
-                    )}
+                  <p className={`font-serif text-right leading-loose text-emerald-100 ${
+                    fontSize === 'sm' ? 'text-2xl' : fontSize === 'md' ? 'text-3xl' : 'text-4xl'
+                  }`}>
+                    {ayat.teksArab}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-800/60 space-y-1">
+                  <p className="text-emerald-400/90 text-sm italic">{ayat.teksLatin}</p>
+                  <p className="text-slate-300 text-sm">{ayat.teksIndonesia}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* TAB 3: JADWAL SHOLAT & KIBLAT (ALADHAN API REAL) */}
+        {activeTab === "sholat" && (
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* CARI KOTA VIA ALADHAN */}
+            <form onSubmit={handleCitySearch} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                <Search size={14} /> Cari Nama Kota / Daerah:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={cityInput}
+                  onChange={(e) => setCityInput(e.target.value)}
+                  placeholder="Contoh: Jakarta, Surabaya, Bandung, Medan..."
+                  className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition cursor-pointer"
+                >
+                  Cari
+                </button>
+              </div>
+            </form>
+
+            {/* HASIL JADWAL SHOLAT */}
+            <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div className="text-left">
+                  <span className="text-xs text-emerald-400 font-semibold tracking-wider uppercase">Jadwal Sholat (Aladhan API)</span>
+                  <h3 className="text-2xl font-bold text-white capitalize">{selectedCity}</h3>
+                </div>
+                {jadwalSholat && (
+                  <span className="text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                    {jadwalSholat.ReadableDate}
+                  </span>
+                )}
+              </div>
+              
+              {loadingSholat ? (
+                <div className="py-8 flex justify-center"><Loader2 className="animate-spin text-emerald-500" size={28} /></div>
+              ) : errorSholat ? (
+                <div className="p-4 bg-rose-950/40 text-rose-300 text-sm rounded-xl border border-rose-800">
+                  {errorSholat}
+                </div>
+              ) : jadwalSholat ? (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-400">Subuh</span>
+                    <p className="text-xl font-bold text-white">{jadwalSholat.Fajr.split(" ")[0]}</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-400">Dzuhur</span>
+                    <p className="text-xl font-bold text-white">{jadwalSholat.Dhuhr.split(" ")[0]}</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-400">Ashar</span>
+                    <p className="text-xl font-bold text-white">{jadwalSholat.Asr.split(" ")[0]}</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-400">Maghrib</span>
+                    <p className="text-xl font-bold text-white">{jadwalSholat.Maghrib.split(" ")[0]}</p>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <span className="text-xs text-slate-400">Isya</span>
+                    <p className="text-xl font-bold text-white">{jadwalSholat.Isha.split(" ")[0]}</p>
                   </div>
                 </div>
-              ))}
+              ) : null}
+            </div>
+
+            {/* SENSOR KIBLAT */}
+            <div className="bg-slate-900/60 p-8 rounded-2xl border border-slate-800 text-center space-y-4">
+              <Compass 
+                size={56} 
+                className={`mx-auto text-emerald-400 transition-transform duration-300 ${kompasActive ? '' : 'animate-pulse'}`} 
+                style={{ transform: heading !== null ? `rotate(${heading}deg)` : 'none' }}
+              />
+              <div>
+                <h3 className="font-bold text-white text-lg">Sensor Arah Kiblat</h3>
+                <p className="text-xs text-slate-400">
+                  {heading !== null ? `Arah Kompas HP: ${heading}°` : "Klik tombol di bawah untuk mengaktifkan sensor arah kompas HP."}
+                </p>
+              </div>
+              <button 
+                onClick={startCompass}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition cursor-pointer"
+              >
+                {kompasActive ? "Sensor Aktif" : "Aktifkan Kompas HP"}
+              </button>
             </div>
           </div>
         )}
+
+        {/* TAB 4: PETA & LOKASI REAL */}
+        {activeTab === "haul" && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <span className="px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-semibold">
+                    Lokasi Kegiatan
+                  </span>
+                  <h3 className="text-2xl font-bold text-white mt-2">Masjid / Majelis K&B</h3>
+                  <p className="text-slate-400 text-sm">Petunjuk Lokasi Google Maps Real</p>
+                </div>
+                <a 
+                  href="https://maps.google.com/?q=Masjid" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"
+                >
+                  <Navigation size={16} /> Buka Peta Google
+                </a>
+              </div>
+
+              {/* IFRAME GOOGLE MAPS REAL */}
+              <div className="w-full h-80 rounded-xl overflow-hidden border border-slate-800">
+                <iframe
+                  title="Google Maps Location"
+                  src="https://maps.google.com/maps?q=Monas%20Jakarta&t=&z=13&ie=UTF8&iwloc=&output=embed"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                ></iframe>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
+
+      <footer className="bg-slate-900/80 border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+        <p>© 2026 Organisasi K&B. Hak Cipta Dilindungi.</p>
+      </footer>
     </div>
   );
 }
