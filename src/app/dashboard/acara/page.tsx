@@ -245,7 +245,7 @@ export default function AcaraPage() {
                     <td className="px-6 py-4 font-semibold text-white">
                       <div className="flex items-center gap-3">
                         <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
-                        {item.tittle}
+                        {item.title}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-300">
