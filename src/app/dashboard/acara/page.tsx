@@ -1,221 +1,231 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Calendar, PlusCircle, Clock, MapPin } from 'lucide-react'
+import { useState, useEffect } from "react";
 
-type EventItem = {
-  id: number
-  title: string
-  date: string
-  time: string
-  location: string
-  status: 'Mendatang' | 'Berjalan' | 'Selesai'
+interface EventItem {
+  ID: string;
+  TITLE: string;
+  START_DATE: string;
+  END_DATE?: string;
+  LOCATION: string;
 }
 
 export default function AcaraPage() {
-  const searchParams = useSearchParams()
-  const defaultAction = searchParams.get('action')
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [events, setEvents] = useState<EventItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [formData, setFormData] = useState({
+    title: "",
+    startDate: "",
+    endDate: "",
+    location: "",
+  });
 
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
-  const [location, setLocation] = useState('')
-
-  // 1. Fetch Data Acara dari Oracle API
   const fetchEvents = async () => {
     try {
-      setLoading(true)
-      const res = await fetch('/api/events')
-      const data = await res.json()
-      if (Array.isArray(data)) {
-        setEvents(data)
-      }
+      const res = await fetch("/api/events");
+      const result = await res.json();
+      if (result.success) setEvents(result.data);
     } catch (err) {
-      console.error('Gagal mengambil data acara:', err)
-    } finally {
-      setLoading(false)
+      console.error("Gagal mengambil data", err);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchEvents()
-  }, [])
+    fetchEvents();
+  }, []);
 
-  useEffect(() => {
-    if (defaultAction === 'baru') {
-      setIsModalOpen(true)
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setFormData({ title: "", startDate: "", endDate: "", location: "" });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (item: EventItem) => {
+    setEditingId(item.ID);
+    setFormData({
+      title: item.TITLE,
+      startDate: item.START_DATE ? item.START_DATE.substring(0, 16) : "",
+      endDate: item.END_DATE ? item.END_DATE.substring(0, 16) : "",
+      location: item.LOCATION,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const method = editingId ? "PUT" : "POST";
+      const payload = editingId ? { id: editingId, ...formData } : formData;
+
+      const res = await fetch("/api/events", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        setIsModalOpen(false);
+        fetchEvents();
+      } else {
+        alert(result.message || "Gagal menyimpan acara");
+      }
+    } catch (error) {
+      alert("Terjadi kesalahan sistem saat menyimpan ke database.");
     }
-  }, [defaultAction])
+  };
 
-  // 2. Submit Data Acara Baru ke Oracle API
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title || !date) return
-
-    const payload = {
-      title,
-      date,
-      time: time || 'Seharian',
-      location: location || 'Lokasi Belum Ditentukan',
-      status: 'Mendatang',
-    }
+  const handleDelete = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus acara ini?")) return;
 
     try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      if (res.ok) {
-        setIsModalOpen(false)
-        setTitle('')
-        setDate('')
-        setTime('')
-        setLocation('')
-        fetchEvents() // Reload data dari database Oracle
+      const res = await fetch(`/api/events?id=${id}`, { method: "DELETE" });
+      const result = await res.json();
+      if (result.success) {
+        fetchEvents();
+      } else {
+        alert(result.message || "Gagal menghapus acara");
       }
-    } catch (err) {
-      console.error('Gagal menyimpan acara:', err)
+    } catch (error) {
+      alert("Terjadi kesalahan sistem saat menghapus dari database.");
     }
-  }
+  };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Acara & Kegiatan</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Kelola jadwal kegiatan, rapat, dan agenda organisasi.
-          </p>
-        </div>
-
+    <div className="p-6 text-white bg-slate-950 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Manajemen Acara / Kegiatan</h1>
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs transition-all active:scale-95"
+          onClick={handleOpenCreate}
+          className="bg-cyan-500 hover:bg-cyan-600 text-white font-medium px-4 py-2 rounded-lg transition"
         >
-          <PlusCircle className="w-4 h-4" /> + Acara Baru
+          + Tambah Acara Baru
         </button>
       </div>
 
-      {loading ? (
-        <p className="text-xs text-slate-400">Memuat acara dari Oracle DB...</p>
-      ) : events.length === 0 ? (
-        <p className="text-xs text-slate-500 text-center py-10">Belum ada acara yang tersimpan di database Oracle.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.map((item) => (
-            <div
-              key={item.id}
-              className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md space-y-4 flex flex-col justify-between"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                      item.status === 'Mendatang'
-                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-                        : item.status === 'Berjalan'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                  <Calendar className="w-4 h-4 text-slate-500" />
-                </div>
-
-                <h3 className="text-base font-bold text-white pt-1">{item.title}</h3>
-
-                <div className="space-y-1.5 pt-2 text-xs text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <span>
-                      {item.date} • {item.time}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <span className="truncate">{item.location}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <table className="w-full text-left text-slate-300">
+          <thead className="bg-slate-800 text-slate-400 uppercase text-xs">
+            <tr>
+              <th className="p-4">Nama Acara</th>
+              <th className="p-4">Mulai</th>
+              <th className="p-4">Selesai</th>
+              <th className="p-4">Lokasi</th>
+              <th className="p-4 text-center">Aksi (Admin)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center p-6 text-slate-500">
+                  Belum ada acara di database.
+                </td>
+              </tr>
+            ) : (
+              events.map((item) => (
+                <tr key={item.ID} className="border-t border-slate-800 hover:bg-slate-800/50">
+                  <td className="p-4 font-medium text-white">{item.TITLE}</td>
+                  <td className="p-4">{item.START_DATE}</td>
+                  <td className="p-4">{item.END_DATE || "-"}</td>
+                  <td className="p-4">{item.LOCATION}</td>
+                  <td className="p-4 text-center space-x-2">
+                    <button
+                      onClick={() => handleOpenEdit(item)}
+                      className="px-3 py-1 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 rounded text-sm transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.ID)}
+                      className="px-3 py-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded text-sm transition"
+                    >
+                      Hapus
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Buat Acara / Kegiatan Baru</h3>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-semibold mb-5 text-white">
+              {editingId ? "Edit Acara / Kegiatan" : "Buat Acara / Kegiatan Baru"}
+            </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Nama Acara / Kegiatan</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  Nama Acara / Kegiatan
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Rapat Pleno Kas"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Contoh: Rapat Anggota"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Tanggal</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    Waktu Mulai
+                  </label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
-
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Waktu / Jam</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    Waktu Selesai
+                  </label>
                   <input
-                    type="text"
-                    placeholder="10:00 - 12:00"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    type="datetime-local"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Lokasi / Tempat</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  Lokasi / Tempat
+                </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Gedung A / Zoom Meeting"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  required
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="Mushollah Ubaidillah"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium"
+                  className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs"
+                  className="px-4 py-2 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition font-medium"
                 >
-                  Simpan Acara
+                  {editingId ? "Perbarui" : "Simpan Acara"}
                 </button>
               </div>
             </form>
@@ -223,5 +233,5 @@ export default function AcaraPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
