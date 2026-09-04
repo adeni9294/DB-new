@@ -47,27 +47,58 @@ interface KasSummaryType {
 interface EventItem {
   id?: number | string;
   ID?: number | string;
-  NAMA_ACARA?: string;
-  TITLE?: string;
   title?: string;
+  TITLE?: string;
+  NAMA_ACARA?: string;
+  startDate?: string;
+  START_DATE?: string;
   WAKTU_MULAI?: string;
+  endDate?: string;
+  END_DATE?: string;
   WAKTU_SELESAI?: string;
-  START_TIME?: string;
-  END_TIME?: string;
-  date_description?: string;
-  LOKASI?: string;
-  LOCATION?: string;
   location?: string;
-  KATEGORI?: string;
-  CATEGORY?: string;
+  LOCATION?: string;
+  LOKASI?: string;
   category?: string;
+  KATEGORI?: string;
 }
+
+// Helper untuk menghitung status acara berdasarkan waktu secara realtime
+const getEventStatus = (startDateStr?: string, endDateStr?: string) => {
+  if (!startDateStr) return { label: "Belum Ditentukan", color: "bg-slate-800 text-slate-400 border-slate-700" };
+
+  const now = new Date();
+  const start = new Date(startDateStr);
+  const end = endDateStr ? new Date(endDateStr) : null;
+
+  if (now < start) {
+    return { label: "Belum Dimulai", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" };
+  } else if (end && now >= start && now <= end) {
+    return { label: "Sedang Berjalan", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 animate-pulse" };
+  } else if (now > (end || start)) {
+    return { label: "Sudah Selesai", color: "bg-slate-800 text-slate-400 border-slate-700" };
+  }
+
+  return { label: "Belum Dimulai", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" };
+};
+
+// Helper untuk memformat ISO string tanggal/jam menjadi tampilan rapi
+const formatDateTime = (dateStr?: string) => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return null;
+
+  return {
+    tanggal: date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+    jam: date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false })
+  };
+};
 
 export default function DashboardClient({ user }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<"transparansi" | "yasin" | "sholat" | "haul">("transparansi");
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
 
-  // State Data - Transparansi Kas (REAL DATA dari Oracle DB)
+  // State Data - Transparansi Kas
   const [kasSummary, setKasSummary] = useState<KasSummaryType>({
     totalSaldo: 0,
     pemasukanBulanIni: 0,
@@ -76,7 +107,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     error: null
   });
 
-  // State Data - Agenda / Events (REAL DATA dari API /api/events)
+  // State Data - Agenda / Events (Sesuai API /api/events)
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
   const [errorEvents, setErrorEvents] = useState<string | null>(null);
@@ -94,20 +125,18 @@ export default function DashboardClient({ user }: DashboardClientProps) {
   const [loadingSholat, setLoadingSholat] = useState<boolean>(false);
   const [errorSholat, setErrorSholat] = useState<string | null>(null);
 
-  // State Kompas Kiblat Real Sensor
+  // State Kompas Kiblat
   const [heading, setHeading] = useState<number | null>(null);
   const [kompasActive, setKompasActive] = useState<boolean>(false);
 
-  // Fetch Real Data Kas Summary
+  // Fetch Summary Kas
   const fetchKasSummary = useCallback(async () => {
     setKasSummary(prev => ({ ...prev, loading: true, error: null }));
     try {
       const res = await fetch('/api/dashboard/summary');
-      
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
       }
-      
       const data = await res.json();
       
       setKasSummary({
@@ -127,7 +156,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     }
   }, []);
 
-  // Fetch Real Data Event dari /api/events
+  // Fetch Events dari /api/events
   const fetchEvents = useCallback(async () => {
     setLoadingEvents(true);
     setErrorEvents(null);
@@ -138,12 +167,12 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       }
       const result = await res.json();
       
-      // Menangani berbagai kemungkinan struktur respon dari /api/events
-      const rawData = Array.isArray(result) 
-        ? result 
-        : result.data || result.events || result.items || [];
-
-      setEvents(rawData);
+      // Mengambil array dari { success: true, data: events }
+      if (result.success && Array.isArray(result.data)) {
+        setEvents(result.data);
+      } else {
+        setEvents(Array.isArray(result) ? result : []);
+      }
     } catch (err: any) {
       console.error('❌ Gagal mengambil data events:', err);
       setErrorEvents(err.message || 'Gagal memuat agenda acara');
@@ -152,7 +181,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     }
   }, []);
 
-  // Fetch Real Data Surah Yasin (Surah No. 36)
+  // Fetch Surah Yasin (Surah No. 36)
   const fetchYasin = useCallback(async () => {
     setLoadingYasin(true);
     setErrorYasin(null);
@@ -171,7 +200,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     }
   }, []);
 
-  // Fetch Real Data Jadwal Sholat (Aladhan API)
+  // Fetch Jadwal Sholat dari Aladhan API
   const fetchJadwalAladhan = useCallback(async (kota: string) => {
     setLoadingSholat(true);
     setErrorSholat(null);
@@ -277,7 +306,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       <section className="relative overflow-hidden bg-gradient-to-b from-emerald-950/40 via-slate-950 to-slate-950 py-10 px-4 sm:px-6 lg:px-8 border-b border-slate-800/60">
         <div className="max-w-4xl mx-auto text-center space-y-4">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Sparkles size={14} /> Selamat Datang Warga & Jama'ah
+            <Sparkles size={14} /> Selamat Datang Warga & Jemaah
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
             Portal Informasi & Layanan Keagamaan
@@ -331,7 +360,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
         </div>
       </section>
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
         
         {/* TAB 1: TRANSPARANSI KAS & AGENDA */}
@@ -391,7 +420,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                   </div>
                 </div>
 
-                {/* AGENDA KEGIATAN DYNAMIC DARI /api/events */}
+                {/* AGENDA KEGIATAN TERDEKAT (REAL DATA FROM /api/events) */}
                 <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -400,7 +429,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                     <button 
                       onClick={fetchEvents}
                       className="p-1.5 text-slate-400 hover:text-white transition cursor-pointer"
-                      title="Refresh Events"
+                      title="Refresh Acara"
                     >
                       <RefreshCw size={14} className={loadingEvents ? "animate-spin" : ""} />
                     </button>
@@ -418,35 +447,44 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                   ) : (
                     <div className="space-y-3">
                       {events.map((event, index) => {
-                        // Fleksibilitas nama kolom Oracle / API (NAMA_ACARA, TITLE, START_TIME, WAKTU_MULAI, dll)
-                        const namaAcara = event.NAMA_ACARA || event.TITLE || event.title || "Acara Tanpa Nama";
-                        
-                        const waktuMulai = event.WAKTU_MULAI || event.START_TIME;
-                        const waktuSelesai = event.WAKTU_SELESAI || event.END_TIME;
-                        
-                        const waktu = waktuMulai 
-                          ? `${waktuMulai} ${waktuSelesai ? `- ${waktuSelesai}` : ''}`
-                          : event.date_description || "Waktu belum ditentukan";
-                          
-                        const lokasi = event.LOKASI || event.LOCATION || event.location;
-                        const kategori = event.KATEGORI || event.CATEGORY || event.category;
+                        // Pembacaan field presisi sesuai API events repository
+                        const namaAcara = event.title || event.TITLE || event.NAMA_ACARA || "Acara Tanpa Nama";
+                        const rawStart = event.startDate || event.START_DATE || event.WAKTU_MULAI;
+                        const rawEnd = event.endDate || event.END_DATE || event.WAKTU_SELESAI;
+                        const lokasi = event.location || event.LOCATION || event.LOKASI;
+
+                        // Formatting Tanggal & Waktu
+                        const startFormatted = formatDateTime(rawStart);
+                        const endFormatted = formatDateTime(rawEnd);
+
+                        // Menghitung status (Belum Dimulai, Sedang Berjalan, Sudah Selesai)
+                        const status = getEventStatus(rawStart, rawEnd);
 
                         return (
                           <div 
                             key={event.id || event.ID || index}
-                            className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+                            className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
                           >
-                            <div>
-                              <h4 className="font-semibold text-white">{namaAcara}</h4>
-                              <p className="text-xs text-slate-400 mt-1">
-                                ⏱️ {waktu} {lokasi ? `• 📍 ${lokasi}` : ''}
-                              </p>
+                            <div className="space-y-1">
+                              <h4 className="font-semibold text-white text-base">{namaAcara}</h4>
+                              
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                {startFormatted ? (
+                                  <span>
+                                    📅 {startFormatted.tanggal} • ⏱️ Jam {startFormatted.jam} {endFormatted ? `- ${endFormatted.jam}` : ''}
+                                  </span>
+                                ) : (
+                                  <span>⏱️ Waktu belum ditentukan</span>
+                                )}
+
+                                {lokasi && <span>• 📍 {lokasi}</span>}
+                              </div>
                             </div>
-                            {kategori && (
-                              <span className="px-3 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                {kategori}
-                              </span>
-                            )}
+
+                            {/* Badge Status Acara */}
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${status.color}`}>
+                              {status.label}
+                            </span>
                           </div>
                         );
                       })}
