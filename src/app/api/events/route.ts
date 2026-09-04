@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, startDate, endDate, location } = body;
+    const { title, startDate, endDate, location, createdBy } = body;
 
     if (!title || !startDate || !location) {
       return NextResponse.json(
@@ -30,7 +30,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newEvent = await createEvent({ title, startDate, endDate, location });
+    const newEvent = await createEvent({ 
+      title, 
+      startDate, 
+      endDate, 
+      location, 
+      createdBy: createdBy || "ADMIN" 
+    });
+    
     return NextResponse.json({ success: true, data: newEvent }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json(
