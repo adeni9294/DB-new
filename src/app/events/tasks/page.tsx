@@ -61,7 +61,7 @@ export default function AcaraPage() {
       }
     } catch (err) {
       showToast("Terjadi kesalahan jaringan saat memuat data", "error");
-    } font-sans finally {
+    } finally {
       setLoading(false);
     }
   };
