@@ -33,37 +33,37 @@ export default function DashboardShell({
   // State Minimize Sidebar
   const [isCollapsed, setIsCollapsed] = useState(false)
 
-  // State Data User Dinamis
-  const [userData, setUserData] = useState<UserType>({
-    fullName: user?.fullName || 'Ahmad Deni',
+  // State Profile
+  const [profile, setProfile] = useState({
+    name: user?.fullName && !user.fullName.includes('@') ? user.fullName : 'Ahmad Deni',
     email: user?.email || 'adeni9294@gmail.com'
   })
 
-  // Fetch Profil dari API Oracle jika props `user` kosong/kurang lengkap
+  // Ambil profil asli jika props user masih berupa email
   useEffect(() => {
-    async function fetchProfile() {
+    async function getProfile() {
       try {
         const res = await fetch('/api/user/profile')
         if (res.ok) {
           const data = await res.json()
-          setUserData({
-            fullName: data.name || user?.fullName || 'Ahmad Deni',
-            email: data.email || user?.email || 'adeni9294@gmail.com'
-          })
+          if (data.name) {
+            setProfile({
+              name: data.name,
+              email: data.email || profile.email
+            })
+          }
         }
       } catch (err) {
-        console.error('Gagal mengambil data profil:', err)
+        console.error('Error fetching profile:', err)
       }
     }
-    fetchProfile()
-  }, [user])
+    getProfile()
+  }, [])
 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
     try {
       localStorage.clear()
     } catch (e) {}
@@ -78,21 +78,21 @@ export default function DashboardShell({
     { name: 'Pengaturan', href: '/dashboard/pengaturan', icon: Settings },
   ]
 
-  const initial = userData.fullName ? userData.fullName.charAt(0).toUpperCase() : 'A'
+  const initial = profile.name ? profile.name.charAt(0).toUpperCase() : 'A'
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans md:flex">
       {/* SIDEBAR */}
       <aside
-        className={`relative bg-slate-900/60 border-r border-slate-800/80 p-4 md:p-6 flex flex-col justify-between backdrop-blur-xl shrink-0 md:fixed md:left-0 md:top-0 md:h-screen z-20 transition-all duration-300 ${
-          isCollapsed ? 'w-full md:w-20' : 'w-full md:w-64'
+        className={`fixed left-0 top-0 h-screen bg-slate-900/60 border-r border-slate-800/80 p-4 flex flex-col justify-between backdrop-blur-xl z-30 transition-all duration-300 ${
+          isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
-        {/* Tombol Minimize Sidebar (Muncul di layar desktop) */}
+        {/* Tombol Toggle Minimize */}
         <button
           type="button"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden md:flex absolute -right-3 top-7 bg-slate-900 border border-slate-700 text-slate-300 hover:text-white p-1 rounded-full shadow-lg z-30 cursor-pointer transition-transform hover:scale-110"
+          className="absolute -right-3 top-7 bg-slate-900 border border-slate-700 text-slate-300 hover:text-white p-1 rounded-full shadow-xl z-50 cursor-pointer transition-transform hover:scale-110"
           title={isCollapsed ? 'Perluas Sidebar' : 'Kecilkan Sidebar'}
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -118,7 +118,6 @@ export default function DashboardShell({
           <nav className="space-y-1.5">
             {menuItems.map((item) => {
               const Icon = item.icon
-
               const isActive =
                 item.href === '/dashboard'
                   ? pathname === '/dashboard'
@@ -145,31 +144,29 @@ export default function DashboardShell({
 
         {/* User Profile & Logout */}
         <div className="pt-6 border-t border-slate-800/80 space-y-3">
-          {/* Box Profil User */}
+          {/* Box Profil */}
           <div
             className={`flex items-center gap-3 px-2 py-2 bg-slate-950/40 border border-slate-800/60 rounded-xl ${
               isCollapsed ? 'justify-center' : ''
             }`}
-            title={isCollapsed ? `${userData.fullName}\n${userData.email}` : undefined}
+            title={isCollapsed ? `${profile.name}\n${profile.email}` : undefined}
           >
             <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center text-cyan-400 font-semibold text-sm shrink-0">
               <UserIcon className="w-4 h-4" />
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                {/* BARIS 1: NAMA LENGKAP */}
                 <p className="text-xs font-bold text-slate-200 truncate">
-                  {userData.fullName}
+                  {profile.name}
                 </p>
-                {/* BARIS 2: EMAIL */}
                 <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                  {userData.email}
+                  {profile.email}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Tombol Logout */}
+          {/* Logout */}
           <button
             onClick={handleLogout}
             title={isCollapsed ? 'Keluar (Logout)' : undefined}
@@ -183,10 +180,10 @@ export default function DashboardShell({
         </div>
       </aside>
 
-      {/* KONTEN UTAMA (Margin otomatis menyesuaikan saat sidebar diminimize) */}
+      {/* KONTEN UTAMA */}
       <main
         className={`flex-1 overflow-y-auto p-6 md:p-8 transition-all duration-300 ${
-          isCollapsed ? 'md:ml-20' : 'md:ml-64'
+          isCollapsed ? 'ml-20' : 'ml-64'
         }`}
       >
         {children}
