@@ -252,7 +252,7 @@ export default function AcaraPage() {
                       {formatDateDisplay(item.startDate)}
                     </td>
                     <td className="px-6 py-4 text-slate-400">
-                      {formatDateDisplay(item.item.endDate)}
+                      {formatDateDisplay(item.endDate)}
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300">
