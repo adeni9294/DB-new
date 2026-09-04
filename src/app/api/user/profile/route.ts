@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateProfile } from "@/lib/oracle/repositories/authRepository";
 import { executeQuery } from "@/lib/oracle/pool";
 
+// Paksa Vercel/Next.js memperlakukan route ini secara dinamis (tanpa static prerender)
+export const dynamic = 'force-dynamic';
+
+// GET Profile dari Oracle DB
 export async function GET() {
   try {
     const sql = `SELECT email, full_name, role FROM users WHERE email = :email`;
@@ -16,12 +20,13 @@ export async function GET() {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { message: error?.message || "Gagal memuat profil dari Oracle" },
+      { message: error?.message || "Gagal memuat profil" },
       { status: 500 }
     );
   }
 }
 
+// PUT Update Profile
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
@@ -29,7 +34,7 @@ export async function PUT(req: NextRequest) {
 
     if (!email || !name) {
       return NextResponse.json(
-        { message: "Nama dan Email tidak boleh kosong" },
+        { message: "Nama dan email tidak boleh kosong" },
         { status: 400 }
       );
     }
@@ -38,12 +43,12 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Profil berhasil diperbarui ke Oracle Database!",
+      message: "Profil berhasil diperbarui!",
     });
   } catch (error: any) {
     console.error("❌ Error Update Profile:", error);
     return NextResponse.json(
-      { message: error?.message || "Gagal memperbarui profil di Oracle Database" },
+      { message: error?.message || "Gagal memperbarui profil" },
       { status: 500 }
     );
   }
