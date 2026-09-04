@@ -26,6 +26,7 @@ export default function AcaraPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   const [formData, setFormData] = useState({
@@ -69,7 +70,6 @@ export default function AcaraPage() {
     fetchEvents();
   }, []);
 
-  // Helper untuk membaca nilai field terlepas dari huruf kapital/kecil
   const getValue = (item: EventItem, keyUpper: keyof EventItem, keyLower: keyof EventItem) => {
     return (item[keyLower] ?? item[keyUpper] ?? "") as string;
   };
@@ -141,11 +141,11 @@ export default function AcaraPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus acara ini?")) return;
+  const confirmDelete = async () => {
+    if (!deletingId) return;
 
     try {
-      const res = await fetch(`/api/events?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/events?id=${deletingId}`, { method: "DELETE" });
       const result = await res.json();
       if (result.success) {
         showToast("Acara berhasil dihapus dari database", "info");
@@ -155,17 +155,19 @@ export default function AcaraPage() {
       }
     } catch (error) {
       showToast("Terjadi kesalahan sistem saat menghapus data.", "error");
+    } finally {
+      setDeletingId(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 p-4 md:p-8 relative">
-      {/* Toast Notification Container */}
+    <div className="min-h-screen bg-[#090d16] text-slate-100 p-4 md:p-8 relative font-sans">
+      {/* Toast Notifications */}
       <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-center justify-between p-4 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-300 animate-slide-in ${
+            className={`pointer-events-auto flex items-center justify-between p-4 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-300 ${
               toast.type === "success"
                 ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
                 : toast.type === "error"
@@ -174,37 +176,17 @@ export default function AcaraPage() {
             }`}
           >
             <div className="flex items-center gap-3">
-              {toast.type === "success" && (
-                <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {toast.type === "error" && (
-                <svg className="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-              {toast.type === "info" && (
-                <svg className="w-5 h-5 text-cyan-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
               <span className="text-sm font-medium">{toast.message}</span>
             </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white transition ml-3"
-            >
-              ✕
-            </button>
+            <button onClick={() => removeToast(toast.id)} className="text-slate-400 hover:text-white ml-3">✕</button>
           </div>
         ))}
       </div>
 
-      {/* Top Bar Header */}
+      {/* Header */}
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
             Manajemen Acara & Kegiatan
           </h1>
           <p className="text-slate-400 text-sm mt-1">
@@ -214,42 +196,39 @@ export default function AcaraPage() {
 
         <button
           onClick={handleOpenCreate}
-          className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-cyan-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0"
+          className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium px-4 py-2.5 rounded-xl shadow-lg shadow-cyan-500/20 transition-all text-sm"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
           </svg>
-          Tambah Acara Baru
+          Tambah Acara
         </button>
       </div>
 
-      {/* Main Content Table Area */}
-      <div className="max-w-7xl mx-auto bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden">
+      {/* Table Container */}
+      <div className="max-w-7xl mx-auto bg-[#0d1322]/80 border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-            <span>Memuat data acara dari Oracle DB...</span>
+            <div className="w-7 h-7 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm">Memuat data...</span>
           </div>
         ) : events.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
-            <svg className="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+          <div className="p-12 text-center text-slate-500 text-sm">
             Belum ada acara tersimpan di database.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-800/50 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-800">
+              <thead className="bg-slate-900/40 text-slate-400 text-xs tracking-wider border-b border-slate-800/80">
                 <tr>
-                  <th className="px-6 py-4">Nama Acara</th>
-                  <th className="px-6 py-4">Waktu Mulai</th>
-                  <th className="px-6 py-4">Waktu Selesai</th>
-                  <th className="px-6 py-4">Lokasi</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-6 py-4 font-medium">NAMA ACARA</th>
+                  <th className="px-6 py-4 font-medium">WAKTU MULAI</th>
+                  <th className="px-6 py-4 font-medium">WAKTU SELESAI</th>
+                  <th className="px-6 py-4 font-medium">LOKASI</th>
+                  <th className="px-6 py-4 font-medium text-center">AKSI</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-800/50">
                 {events.map((item, index) => {
                   const id = getValue(item, "ID", "id") || String(index);
                   const title = getValue(item, "TITLE", "title");
@@ -258,22 +237,22 @@ export default function AcaraPage() {
                   const location = getValue(item, "LOCATION", "location");
 
                   return (
-                    <tr key={id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-white">
+                    <tr key={id} className="hover:bg-slate-800/20 transition-colors">
+                      <td className="px-6 py-4 font-normal text-slate-200">
                         <div className="flex items-center gap-3">
-                          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
+                          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
                           {title}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-slate-300">
+                      <td className="px-6 py-4 text-slate-400 font-light">
                         {formatDateDisplay(startDate)}
                       </td>
-                      <td className="px-6 py-4 text-slate-400">
+                      <td className="px-6 py-4 text-slate-400 font-light">
                         {formatDateDisplay(endDate)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300">
-                          <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-light bg-slate-800/60 border border-slate-700/50 text-slate-300">
+                          <svg className="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
@@ -282,17 +261,25 @@ export default function AcaraPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
+                          {/* Tombol Edit Icon Keuangan */}
                           <button
                             onClick={() => handleOpenEdit(item)}
-                            className="px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 rounded-lg text-xs font-medium transition"
+                            className="p-2 bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/60 rounded-lg transition"
+                            title="Edit Acara"
                           >
-                            Edit
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
                           </button>
+                          {/* Tombol Hapus Icon Keuangan */}
                           <button
-                            onClick={() => handleDelete(id)}
-                            className="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-xs font-medium transition"
+                            onClick={() => setDeletingId(id)}
+                            className="p-2 bg-slate-800/80 text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 border border-slate-700/60 rounded-lg transition"
+                            title="Hapus Acara"
                           >
-                            Hapus
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         </div>
                       </td>
@@ -305,37 +292,32 @@ export default function AcaraPage() {
         )}
       </div>
 
-      {/* Modal Popup */}
+      {/* Modal Form Edit / Create */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </span>
-              {editingId ? "Edit Acara" : "Buat Acara Baru"}
+          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
+            <h2 className="text-lg font-semibold text-white mb-6">
+              {editingId ? "Edit Acara" : "Tambah Acara Baru"}
             </h2>
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Nama Acara / Kegiatan
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                  Nama Acara
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Contoh: Rapat Evaluasi Bulanan"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                  placeholder="Contoh: Rapat Evaluasi"
+                  className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
                     Waktu Mulai
                   </label>
                   <input
@@ -343,25 +325,25 @@ export default function AcaraPage() {
                     required
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">
                     Waktu Selesai
                   </label>
                   <input
                     type="datetime-local"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                    className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Lokasi / Tempat
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                  Lokasi
                 </label>
                 <input
                   type="text"
@@ -369,26 +351,57 @@ export default function AcaraPage() {
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="Contoh: Mushollah Ubaidillah"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                  className="w-full bg-[#090d16] border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-800/80 mt-6">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800 mt-6">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition font-medium text-sm"
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition text-sm"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 font-semibold text-sm shadow-lg shadow-cyan-500/20 transition"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium text-sm transition"
                 >
-                  {editingId ? "Perbarui Acara" : "Simpan Acara"}
+                  Simpan
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Custom (Ganti confirm bawaan browser) */}
+      {deletingId && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center">
+            <div className="w-12 h-12 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">Hapus Acara?</h3>
+            <p className="text-slate-400 text-sm mb-6">
+              Apakah Anda yakin ingin menghapus acara ini? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition text-sm w-full"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium transition text-sm w-full"
+              >
+                Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}
