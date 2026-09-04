@@ -117,7 +117,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       }
     } catch (err: any) {
       setErrorYasin(err.message || "Terjadi kesalahan saat memuat Yasin");
-    } fontally {
+    } finally {
       setLoadingYasin(false);
     }
   }, []);
