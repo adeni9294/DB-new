@@ -45,10 +45,17 @@ interface KasSummaryType {
 }
 
 interface EventItem {
-  id: number | string;
-  title: string;
-  date_description: string; // contoh: "Setiap Kamis Malam • Ba'da Isya" atau "12 Oktober 2026"
-  category?: string; // contoh: "Rutin", "Khusus", "Haul"
+  id?: number | string;
+  ID?: number | string;
+  NAMA_ACARA?: string;
+  title?: string;
+  WAKTU_MULAI?: string;
+  WAKTU_SELESAI?: string;
+  date_description?: string;
+  LOKASI?: string;
+  location?: string;
+  KATEGORI?: string;
+  category?: string;
 }
 
 export default function DashboardClient({ user }: DashboardClientProps) {
@@ -116,24 +123,30 @@ export default function DashboardClient({ user }: DashboardClientProps) {
   }, []);
 
   // Fetch Real Data Agenda / Acara
-  const fetchEvents = useCallback(async () => {
-    setLoadingEvents(true);
-    setErrorEvents(null);
-    try {
-      const res = await fetch('/api/events'); // Sesuaikan endpoint API acara Anda (misal: /api/acara)
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
-      }
-      const data = await res.json();
-      // Asumsi API mengembalikan array data acara [{ id, title, date_description, category }]
-      setEvents(Array.isArray(data) ? data : data.events || []);
-    } catch (err: any) {
-      console.error('❌ Gagal mengambil data acara:', err);
-      setErrorEvents(err.message || 'Gagal memuat agenda acara');
-    } finally {
-      setLoadingEvents(false);
+ // Update fungsi fetchEvents di dalam komponen
+const fetchEvents = useCallback(async () => {
+  setLoadingEvents(true);
+  setErrorEvents(null);
+  try {
+    const res = await fetch('/api/events'); // atau /api/acara
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status}`);
     }
-  }, []);
+    const result = await res.json();
+    
+    // Menangani berbagai format return API (Array langsung / { data: [] } / { events: [] })
+    const rawData = Array.isArray(result) 
+      ? result 
+      : result.data || result.events || [];
+
+    setEvents(rawData);
+  } catch (err: any) {
+    console.error('❌ Gagal mengambil data acara:', err);
+    setErrorEvents(err.message || 'Gagal memuat agenda acara');
+  } finally {
+    setLoadingEvents(false);
+  }
+}, []);
 
   // 1. Fetch Real Data Surah Yasin (Surah No. 36)
   const fetchYasin = useCallback(async () => {
