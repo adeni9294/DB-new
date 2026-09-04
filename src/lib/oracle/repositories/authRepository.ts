@@ -42,7 +42,7 @@ export async function validateSession(token: string): Promise<UserSession | null
       AND s.expires_at > CURRENT_TIMESTAMP
   `;
 
-  const rows = await executeQuery(sql, { token }) as DbUserSessionRow[]; // <-- INI YG BENER
+  const rows = await executeQuery(sql, { token }) as DbUserSessionRow[];
   if (rows.length === 0) return null;
 
   const row = rows[0];
@@ -53,4 +53,16 @@ export async function validateSession(token: string): Promise<UserSession | null
     role: row.role,
     token: row.session_token,
   };
+}
+
+// Fungsi Tambahan untuk Fitur Pengaturan Profil
+export async function updateProfile({ name, email }: { name: string; email: string }) {
+  const sql = `
+    UPDATE users 
+    SET name = :name 
+    WHERE email = :email
+  `;
+
+  await executeQuery(sql, { name, email });
+  return { name, email };
 }
