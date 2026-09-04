@@ -28,27 +28,29 @@ export default function Sidebar() {
 
   // Ambil data user secara dinamis saat komponen dimuat
   useEffect(() => {
-    try {
-      // 1. Cek dari localStorage jika disimpan lokal
-      const storedEmail = localStorage.getItem("userEmail") || localStorage.getItem("email");
-      if (storedEmail) {
-        setUserEmail(storedEmail);
-        return;
-      }
+    async function fetchUserData() {
+      try {
+        // 1. Cek dari localStorage jika disimpan lokal
+        const storedEmail = localStorage.getItem("userEmail") || localStorage.getItem("email");
+        if (storedEmail) {
+          setUserEmail(storedEmail);
+          return;
+        }
 
-      // 2. Atau ambil dari API session auth
-      fetch("/api/auth/me")
-        ? fetch("/api/auth/me")
-            .then((res) => (res.ok ? res.json() : null))
-            .then((data) => {
-              if (data?.email) setUserEmail(data.email);
-              else setUserEmail("User Account");
-            })
-            .catch(() => setUserEmail("User Account"))
-        : setUserEmail("User Account");
-    } catch (err) {
-      setUserEmail("User Account");
+        // 2. Ambil dari API session auth
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setUserEmail(data?.email || "User Account");
+        } else {
+          setUserEmail("User Account");
+        }
+      } catch (err) {
+        setUserEmail("User Account");
+      }
     }
+
+    fetchUserData();
   }, []);
 
   const handleLogout = () => {
