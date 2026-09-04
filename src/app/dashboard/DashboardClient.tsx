@@ -48,13 +48,18 @@ interface EventItem {
   id?: number | string;
   ID?: number | string;
   NAMA_ACARA?: string;
+  TITLE?: string;
   title?: string;
   WAKTU_MULAI?: string;
   WAKTU_SELESAI?: string;
+  START_TIME?: string;
+  END_TIME?: string;
   date_description?: string;
   LOKASI?: string;
+  LOCATION?: string;
   location?: string;
   KATEGORI?: string;
+  CATEGORY?: string;
   category?: string;
 }
 
@@ -71,7 +76,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     error: null
   });
 
-  // State Data - Agenda / Acara (REAL DATA dari API Acara)
+  // State Data - Agenda / Events (REAL DATA dari API /api/events)
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loadingEvents, setLoadingEvents] = useState<boolean>(true);
   const [errorEvents, setErrorEvents] = useState<string | null>(null);
@@ -93,7 +98,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
   const [heading, setHeading] = useState<number | null>(null);
   const [kompasActive, setKompasActive] = useState<boolean>(false);
 
-  // Fetch Real Data Kas Summary dari Oracle DB via API
+  // Fetch Real Data Kas Summary
   const fetchKasSummary = useCallback(async () => {
     setKasSummary(prev => ({ ...prev, loading: true, error: null }));
     try {
@@ -122,32 +127,32 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     }
   }, []);
 
-  // Fetch Real Data Agenda / Acara dari endpoint /api/acara
+  // Fetch Real Data Event dari /api/events
   const fetchEvents = useCallback(async () => {
     setLoadingEvents(true);
     setErrorEvents(null);
     try {
-      const res = await fetch('/api/acara');
+      const res = await fetch('/api/events');
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
       }
       const result = await res.json();
       
-      // Menangani berbagai format return API (Array langsung / { data: [] } / { events: [] } / { acara: [] })
+      // Menangani berbagai kemungkinan struktur respon dari /api/events
       const rawData = Array.isArray(result) 
         ? result 
-        : result.data || result.events || result.acara || [];
+        : result.data || result.events || result.items || [];
 
       setEvents(rawData);
     } catch (err: any) {
-      console.error('❌ Gagal mengambil data acara:', err);
+      console.error('❌ Gagal mengambil data events:', err);
       setErrorEvents(err.message || 'Gagal memuat agenda acara');
     } finally {
       setLoadingEvents(false);
     }
   }, []);
 
-  // 1. Fetch Real Data Surah Yasin (Surah No. 36)
+  // Fetch Real Data Surah Yasin (Surah No. 36)
   const fetchYasin = useCallback(async () => {
     setLoadingYasin(true);
     setErrorYasin(null);
@@ -166,7 +171,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     }
   }, []);
 
-  // 2. Fetch Real Data Jadwal Sholat dari ALADHAN API (Method 20 = Kemenag RI)
+  // Fetch Real Data Jadwal Sholat (Aladhan API)
   const fetchJadwalAladhan = useCallback(async (kota: string) => {
     setLoadingSholat(true);
     setErrorSholat(null);
@@ -222,7 +227,6 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     }
   };
 
-  // Handler Kompas Kiblat Sensor Device
   const startCompass = () => {
     if (typeof window !== "undefined" && "DeviceOrientationEvent" in window) {
       window.addEventListener("deviceorientation", (e) => {
@@ -273,7 +277,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       <section className="relative overflow-hidden bg-gradient-to-b from-emerald-950/40 via-slate-950 to-slate-950 py-10 px-4 sm:px-6 lg:px-8 border-b border-slate-800/60">
         <div className="max-w-4xl mx-auto text-center space-y-4">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Sparkles size={14} /> Selamat Datang Warga & Jemaah
+            <Sparkles size={14} /> Selamat Datang Warga & Jama'ah
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
             Portal Informasi & Layanan Keagamaan
@@ -387,7 +391,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                   </div>
                 </div>
 
-                {/* AGENDA KEGIATAN DYNAMIC */}
+                {/* AGENDA KEGIATAN DYNAMIC DARI /api/events */}
                 <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -395,8 +399,8 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                     </h3>
                     <button 
                       onClick={fetchEvents}
-                      className="p-1.5 text-slate-400 hover:text-white transition"
-                      title="Refresh Acara"
+                      className="p-1.5 text-slate-400 hover:text-white transition cursor-pointer"
+                      title="Refresh Events"
                     >
                       <RefreshCw size={14} className={loadingEvents ? "animate-spin" : ""} />
                     </button>
@@ -414,13 +418,18 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                   ) : (
                     <div className="space-y-3">
                       {events.map((event, index) => {
-                        // Fallback nama field dari database / API
-                        const namaAcara = event.NAMA_ACARA || event.title || "Acara Tanpa Nama";
-                        const waktu = event.WAKTU_MULAI 
-                          ? `${event.WAKTU_MULAI} ${event.WAKTU_SELESAI ? `- ${event.WAKTU_SELESAI}` : ''}`
+                        // Fleksibilitas nama kolom Oracle / API (NAMA_ACARA, TITLE, START_TIME, WAKTU_MULAI, dll)
+                        const namaAcara = event.NAMA_ACARA || event.TITLE || event.title || "Acara Tanpa Nama";
+                        
+                        const waktuMulai = event.WAKTU_MULAI || event.START_TIME;
+                        const waktuSelesai = event.WAKTU_SELESAI || event.END_TIME;
+                        
+                        const waktu = waktuMulai 
+                          ? `${waktuMulai} ${waktuSelesai ? `- ${waktuSelesai}` : ''}`
                           : event.date_description || "Waktu belum ditentukan";
-                        const lokasi = event.LOKASI || event.location;
-                        const kategori = event.KATEGORI || event.category;
+                          
+                        const lokasi = event.LOKASI || event.LOCATION || event.location;
+                        const kategori = event.KATEGORI || event.CATEGORY || event.category;
 
                         return (
                           <div 
@@ -518,10 +527,9 @@ export default function DashboardClient({ user }: DashboardClientProps) {
           </div>
         )}
 
-        {/* TAB 3: JADWAL SHOLAT & KIBLAT (ALADHAN API REAL) */}
+        {/* TAB 3: JADWAL SHOLAT & KIBLAT */}
         {activeTab === "sholat" && (
           <div className="max-w-3xl mx-auto space-y-6">
-            {/* CARI KOTA VIA ALADHAN */}
             <form onSubmit={handleCitySearch} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-3">
               <label className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
                 <Search size={14} /> Cari Nama Kota / Daerah:
@@ -543,7 +551,6 @@ export default function DashboardClient({ user }: DashboardClientProps) {
               </div>
             </form>
 
-            {/* HASIL JADWAL SHOLAT */}
             <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
               <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                 <div className="text-left">
@@ -589,7 +596,6 @@ export default function DashboardClient({ user }: DashboardClientProps) {
               ) : null}
             </div>
 
-            {/* SENSOR KIBLAT */}
             <div className="bg-slate-900/60 p-8 rounded-2xl border border-slate-800 text-center space-y-4">
               <Compass 
                 size={56} 
@@ -612,7 +618,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
           </div>
         )}
 
-        {/* TAB 4: PETA & LOKASI REAL */}
+        {/* TAB 4: PETA & LOKASI */}
         {activeTab === "haul" && (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
@@ -634,7 +640,6 @@ export default function DashboardClient({ user }: DashboardClientProps) {
                 </a>
               </div>
 
-              {/* IFRAME GOOGLE MAPS REAL */}
               <div className="w-full h-80 rounded-xl overflow-hidden border border-slate-800">
                 <iframe
                   title="Google Maps Location"
