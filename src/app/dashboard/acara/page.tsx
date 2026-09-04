@@ -95,7 +95,7 @@ export default function AcaraPage() {
   const handleOpenEdit = (item: EventItem) => {
     setEditingId(item.id);
     setFormData({
-      title: item.tittle || "",
+      title: item.title || "",
       startDate: formatForInput(item.startDate),
       endDate: formatForInput(item.endDate),
       location: item.location || "",
