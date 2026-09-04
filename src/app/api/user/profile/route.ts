@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateProfile } from "@/lib/oracle/repositories/authRepository";
-import { executeQuery } from "@/lib/oracle/db"; // sesuaikan path helper db kamu
+import { executeQuery } from "@/lib/oracle/pool"; // Perbaikan import dari pool
 
 // GET Profile dari Oracle DB
 export async function GET() {
   try {
     // Ambil data user berdasarkan email yang sedang aktif/login
     const sql = `SELECT email, full_name, role FROM users WHERE email = :email`;
-    const result = await executeQuery(sql, { email: "adeni9294@gmail.com" });
+    const result = (await executeQuery(sql, { email: "adeni9294@gmail.com" })) as any[];
 
-    const user = result.rows?.[0];
+    const user = result?.[0];
 
     return NextResponse.json({
       name: user?.FULL_NAME || user?.full_name || "",
@@ -18,7 +18,7 @@ export async function GET() {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { message: "Gagal memuat profil" },
+      { message: error?.message || "Gagal memuat profil" },
       { status: 500 }
     );
   }
