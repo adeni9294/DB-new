@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateProfile } from "@/lib/oracle/repositories/authRepository";
-import { executeQuery } from "@/lib/oracle/pool"; // Perbaikan import dari pool
+import { executeQuery } from "@/lib/oracle/pool";
 
-// GET Profile dari Oracle DB
 export async function GET() {
   try {
-    // Ambil data user berdasarkan email yang sedang aktif/login
     const sql = `SELECT email, full_name, role FROM users WHERE email = :email`;
     const result = (await executeQuery(sql, { email: "adeni9294@gmail.com" })) as any[];
 
@@ -18,20 +16,20 @@ export async function GET() {
     });
   } catch (error: any) {
     return NextResponse.json(
-      { message: error?.message || "Gagal memuat profil" },
+      { message: error?.message || "Gagal memuat profil dari Oracle" },
       { status: 500 }
     );
   }
 }
 
-// PUT Update Profile
 export async function PUT(req: NextRequest) {
   try {
-    const { name, email } = await req.json();
+    const body = await req.json();
+    const { name, email } = body;
 
-    if (!email) {
+    if (!email || !name) {
       return NextResponse.json(
-        { message: "Email wajib diisi" },
+        { message: "Nama dan Email tidak boleh kosong" },
         { status: 400 }
       );
     }
@@ -40,12 +38,12 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Profil berhasil diperbarui",
+      message: "Profil berhasil diperbarui ke Oracle Database!",
     });
   } catch (error: any) {
     console.error("❌ Error Update Profile:", error);
     return NextResponse.json(
-      { message: error?.message || "Gagal memperbarui profil" },
+      { message: error?.message || "Gagal memperbarui profil di Oracle Database" },
       { status: 500 }
     );
   }
