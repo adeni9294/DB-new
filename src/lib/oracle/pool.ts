@@ -54,10 +54,9 @@ export async function executeQuery(sql: string, binds: any = {}, opts: any = {})
     console.log('[oracle] executing query', { sql, binds });
     const exec = connection.execute(sql, binds, { autoCommit });
     const result: any = await withTimeout(exec as Promise<any>, timeoutMs);
-    // normalize
-    if (result && Array.isArray(result.rows)) return result.rows;
-    if (result && result.outBinds) return result;
-    return [];
+    
+    // PERBAIKAN: Kembalikan objek result seutuhnya agar repository bisa membaca result.rows
+    return result;
   } catch (err) {
     console.error('[oracle] executeQuery error', err);
     throw err;
@@ -72,8 +71,8 @@ export async function executeQuery(sql: string, binds: any = {}, opts: any = {})
 
 export async function pingDB() {
   try {
-    const rows = await executeQuery('SELECT 1 FROM DUAL', {}, { timeoutMs: 3000 });
-    return Array.isArray(rows) && rows.length > 0;
+    const res = await executeQuery('SELECT 1 FROM DUAL', {}, { timeoutMs: 3000 });
+    return Array.isArray(res?.rows) && res.rows.length > 0;
   } catch (e) {
     console.error('[oracle] pingDB failed', e);
     return false;
