@@ -35,7 +35,6 @@ export async function createEvent(data: {
   const id = Date.now().toString();
   const createdBy = data.createdBy || 'ADMIN'; 
 
-  // Menggunakan STATUS 'UPCOMING' (sesuai standar constraint Oracle)
   const sql = `
     INSERT INTO EVENTS (
       ID, 
@@ -54,7 +53,7 @@ export async function createEvent(data: {
       TO_DATE(:startDate, 'YYYY-MM-DD"T"HH24:MI'), 
       TO_DATE(:endDate, 'YYYY-MM-DD"T"HH24:MI'), 
       :location, 
-      'UPCOMING', 
+      'ACTIVE', 
       SYSDATE
     )
   `;
