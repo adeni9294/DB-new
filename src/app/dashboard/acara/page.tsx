@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react";
 
 interface EventItem {
-  id: string;
-  title: string;
-  startDate: string;
+  id?: string;
+  ID?: string;
+  title?: string;
+  TITLE?: string;
+  startDate?: string;
+  START_DATE?: string;
   endDate?: string;
-  location: string;
-  status?: string;
+  END_DATE?: string;
+  location?: string;
+  LOCATION?: string;
 }
 
 interface ToastNotification {
@@ -31,7 +35,6 @@ export default function AcaraPage() {
     location: "",
   });
 
-  // Sistem Alert / Toast Modern
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -49,7 +52,8 @@ export default function AcaraPage() {
     try {
       const res = await fetch("/api/events");
       const result = await res.json();
-      if (result.success) {
+      
+      if (result.success && Array.isArray(result.data)) {
         setEvents(result.data);
       } else {
         showToast(result.message || "Gagal memuat data dari database", "error");
@@ -64,6 +68,11 @@ export default function AcaraPage() {
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // Helper untuk membaca nilai field terlepas dari huruf kapital/kecil
+  const getValue = (item: EventItem, keyUpper: keyof EventItem, keyLower: keyof EventItem) => {
+    return (item[keyLower] ?? item[keyUpper] ?? "") as string;
+  };
 
   const formatForInput = (dateStr?: string) => {
     if (!dateStr) return "";
@@ -93,12 +102,13 @@ export default function AcaraPage() {
   };
 
   const handleOpenEdit = (item: EventItem) => {
-    setEditingId(item.id);
+    const id = getValue(item, "ID", "id");
+    setEditingId(id);
     setFormData({
-      title: item.title || "",
-      startDate: formatForInput(item.startDate),
-      endDate: formatForInput(item.endDate),
-      location: item.location || "",
+      title: getValue(item, "TITLE", "title"),
+      startDate: formatForInput(getValue(item, "START_DATE", "startDate")),
+      endDate: formatForInput(getValue(item, "END_DATE", "endDate")),
+      location: getValue(item, "LOCATION", "location"),
     });
     setIsModalOpen(true);
   };
@@ -240,47 +250,55 @@ export default function AcaraPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {events.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-white">
-                      <div className="flex items-center gap-3">
-                        <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
-                        {item.title}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-300">
-                      {formatDateDisplay(item.startDate)}
-                    </td>
-                    <td className="px-6 py-4 text-slate-400">
-                      {formatDateDisplay(item.endDate)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300">
-                        <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        {item.location}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleOpenEdit(item)}
-                          className="px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 rounded-lg text-xs font-medium transition"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-xs font-medium transition"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {events.map((item, index) => {
+                  const id = getValue(item, "ID", "id") || String(index);
+                  const title = getValue(item, "TITLE", "title");
+                  const startDate = getValue(item, "START_DATE", "startDate");
+                  const endDate = getValue(item, "END_DATE", "endDate");
+                  const location = getValue(item, "LOCATION", "location");
+
+                  return (
+                    <tr key={id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4 font-semibold text-white">
+                        <div className="flex items-center gap-3">
+                          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400"></span>
+                          {title}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-300">
+                        {formatDateDisplay(startDate)}
+                      </td>
+                      <td className="px-6 py-4 text-slate-400">
+                        {formatDateDisplay(endDate)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-300">
+                          <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {location}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(item)}
+                            className="px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 rounded-lg text-xs font-medium transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(id)}
+                            className="px-3 py-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-xs font-medium transition"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
