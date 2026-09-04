@@ -57,14 +57,13 @@ export async function validateSession(token: string): Promise<UserSession | null
 
 // Fungsi Tambahan untuk Fitur Pengaturan Profil
 export async function updateProfile({ name, email }: { name: string; email: string }) {
-  // SQL Query Oracle
+  // Query disesuaikan dengan nama kolom FULL_NAME di database Oracle
   const sql = `
     UPDATE users 
-    SET name = :name 
+    SET full_name = :name 
     WHERE email = :email
   `;
 
-  // Kirim parameter sebagai objek bernama sesuai bind variable
   await executeQuery(sql, { name, email });
 
   return { name, email };
