@@ -13,7 +13,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react'
-import ThemeToggle from '@/components/ThemeToggle' // Sesuaikan path lokasi ThemeToggle.tsx
+import ThemeToggle from '@/components/ThemeToggle'
 
 type UserType = {
   id?: number
@@ -79,9 +79,9 @@ export default function DashboardShell({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans md:flex transition-colors duration-300">
-      {/* SIDEBAR */}
+      {/* SIDEBAR - Menggunakan warna solid agar kontras sempurna di kedua mode */}
       <aside
-        className={`fixed left-0 top-0 h-screen bg-white/80 dark:bg-slate-900/60 border-r border-slate-200 dark:border-slate-800/80 p-4 flex flex-col justify-between backdrop-blur-xl z-30 transition-all duration-300 ${
+        className={`fixed left-0 top-0 h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between z-30 transition-all duration-300 ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -98,8 +98,8 @@ export default function DashboardShell({
         <div className="space-y-6">
           {/* Logo, Brand & Switch Theme */}
           <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white dark:text-slate-950 shadow-lg shadow-cyan-500/20 shrink-0">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-500/20 shrink-0">
                 {initial}
               </div>
               {!isCollapsed && (
@@ -107,12 +107,12 @@ export default function DashboardShell({
                   <span className="text-base font-bold text-slate-900 dark:text-white block leading-tight truncate">
                     Sistem K&B
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">Management Platform</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate block">Management Platform</span>
                 </div>
               )}
             </div>
 
-            {/* Tombol Ganti Tema Mode */}
+            {/* Tombol Ganti Tema */}
             {!isCollapsed && <ThemeToggle />}
           </div>
 
@@ -133,7 +133,7 @@ export default function DashboardShell({
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     isActive
                       ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-transparent'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
                   } ${isCollapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-slate-400'}`} />
@@ -145,8 +145,7 @@ export default function DashboardShell({
         </div>
 
         {/* User Profile & Logout */}
-        <div className="pt-6 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
-          {/* Switch Theme versi minimized */}
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
           {isCollapsed && (
             <div className="flex justify-center pb-2">
               <ThemeToggle />
@@ -155,12 +154,12 @@ export default function DashboardShell({
 
           {/* Box Profil */}
           <div
-            className={`flex items-center gap-3 px-2 py-2 bg-slate-100 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/60 rounded-xl ${
+            className={`flex items-center gap-3 px-2 py-2 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl ${
               isCollapsed ? 'justify-center' : ''
             }`}
             title={isCollapsed ? `${profile.name}\n${profile.email}` : undefined}
           >
-            <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700/60 flex items-center justify-center text-cyan-600 dark:text-cyan-400 font-semibold text-sm shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-cyan-600 dark:text-cyan-400 font-semibold text-sm shrink-0">
               <UserIcon className="w-4 h-4" />
             </div>
             {!isCollapsed && (
