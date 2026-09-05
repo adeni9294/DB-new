@@ -37,6 +37,19 @@ export default function DashboardShell({
     email: user?.email || 'adeni9294@gmail.com'
   })
 
+  // Sinkronisasi Tema saat Komponen Dimuat
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    if (
+      savedTheme === 'dark' ||
+      (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    ) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
+
   useEffect(() => {
     async function getProfile() {
       try {
@@ -79,7 +92,7 @@ export default function DashboardShell({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans md:flex transition-colors duration-300">
-      {/* SIDEBAR - Menggunakan warna solid agar kontras sempurna di kedua mode */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed left-0 top-0 h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between z-30 transition-all duration-300 ${
           isCollapsed ? 'w-20' : 'w-64'
