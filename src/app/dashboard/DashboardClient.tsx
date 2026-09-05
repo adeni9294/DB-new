@@ -194,7 +194,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     } catch (err: any) {
       console.error('❌ Gagal mengambil data events:', err);
       setErrorEvents(err.message || 'Gagal memuat agenda acara');
-    } fontally {
+    } finally {
       setLoadingEvents(false);
     }
   }, []);
@@ -213,7 +213,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       }
     } catch (err: any) {
       setErrorYasin(err.message || "Terjadi kesalahan saat memuat Yasin");
-    } fontally {
+    } finally {
       setLoadingYasin(false);
     }
   }, []);
@@ -250,7 +250,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
       }
     } catch (err: any) {
       setErrorSholat(err.message || "Gagal memuat jadwal sholat Aladhan.");
-    } fontally {
+    } finally {
       setLoadingSholat(false);
     }
   }, []);
