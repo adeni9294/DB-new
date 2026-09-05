@@ -203,7 +203,7 @@ export default function DashboardClient({ user }: DashboardClientProps) {
     } catch (err: any) {
       console.error('❌ Gagal mengambil data events:', err);
       setErrorEvents(err.message || 'Gagal memuat agenda acara');
-    } finally {
+    } fontally {
       setLoadingEvents(false);
     }
   }, []);
